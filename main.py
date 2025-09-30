@@ -247,48 +247,6 @@ with st.sidebar:
     """)
 
     st.divider()
-
-    # 임베딩 시스템 섹션
-    st.header("🧠 임베딩 시스템")
-
-    hs_manager = get_hs_manager()
-    cache_count = len(hs_manager.embeddings_cache)
-
-    st.metric("캐시된 항목 수", f"{cache_count:,}")
-    st.info(f"모델: `{hs_manager.embedding_model}`")
-
-    if cache_count > 0:
-        st.success("임베딩 시스템 활성화")
-        if st.button("임베딩 재생성", type="secondary", use_container_width=True):
-            with st.spinner("임베딩 재생성 중..."):
-                hs_manager.initialize_all_embeddings(force_regenerate=True)
-                st.success("임베딩 재생성 완료!")
-                st.rerun()
-    else:
-        st.warning("임베딩 미생성 (키워드 검색만 사용)")
-        if st.button("임베딩 생성", type="primary", use_container_width=True):
-            with st.spinner("임베딩 생성 중... (수 분 소요 가능)"):
-                progress_placeholder = st.empty()
-
-                class StreamlitProgressLogger:
-                    def __init__(self, placeholder):
-                        self.placeholder = placeholder
-                        self.logs = []
-
-                    def log(self, message):
-                        self.logs.append(message)
-                        self.placeholder.text("\n".join(self.logs[-5:]))
-
-                logger = StreamlitProgressLogger(progress_placeholder)
-
-                try:
-                    hs_manager.initialize_all_embeddings(force_regenerate=False)
-                    st.success("임베딩 생성 완료!")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"임베딩 생성 실패: {e}")
-
-    st.divider()
     
     # 새로운 채팅 시작 버튼
     if st.button("새로운 채팅 시작하기", type="primary"):
