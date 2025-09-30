@@ -103,19 +103,23 @@ def handle_hs_classification_cases(user_input, context, hs_manager, ui_container
 
     # 병렬 처리용 함수
     def process_single_group(i):
-        relevant = hs_manager.get_domestic_context_group(user_input, i)
-        prompt = f"{domestic_context}\n\n관련 데이터 (국내 관세청, 그룹{i+1}):\n{relevant}\n\n사용자: {user_input}\n"
+        try:
+            relevant = hs_manager.get_domestic_context_group(user_input, i)
+            prompt = f"{domestic_context}\n\n관련 데이터 (국내 관세청, 그룹{i+1}):\n{relevant}\n\n사용자: {user_input}\n"
 
-        start_time = datetime.now()
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=prompt
-        )
-        end_time = datetime.now()
-        processing_time = (end_time - start_time).total_seconds()
+            start_time = datetime.now()
+            response = client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=prompt
+            )
+            end_time = datetime.now()
+            processing_time = (end_time - start_time).total_seconds()
 
-        answer = clean_text(response.text)
-        return i, answer, start_time, processing_time
+            answer = clean_text(response.text)
+            return i, answer, start_time, processing_time
+        except Exception as e:
+            error_msg = f"그룹 {i+1} 분석 중 오류 발생: {str(e)}"
+            return i, error_msg, datetime.now(), 0.0
 
     # 5개 그룹 병렬 처리 (max_workers=3)
     if ui_container:
@@ -159,21 +163,27 @@ def handle_hs_classification_cases(user_input, context, hs_manager, ui_container
         st.info("🧠 **Head AI가 모든 분석을 종합하는 중...**")
 
     # Head Agent가 5개 부분 답변을 취합하여 최종 답변 생성
-    head_prompt = f"{domestic_context}\n\n아래는 국내 HS 분류 사례 데이터 5개 그룹별 분석 결과입니다. 각 그룹의 답변을 종합하여 최종 전문가 답변을 작성하세요.\n\n"
-    for idx, ans in enumerate(group_answers):
-        head_prompt += f"[그룹{idx+1} 답변]\n{ans}\n\n"
-    head_prompt += f"\n사용자: {user_input}\n"
-    head_response = client.models.generate_content(
-        model="gemini-2.5-flash",
-        contents=head_prompt
-    )
+    try:
+        head_prompt = f"{domestic_context}\n\n아래는 국내 HS 분류 사례 데이터 5개 그룹별 분석 결과입니다. 각 그룹의 답변을 종합하여 최종 전문가 답변을 작성하세요.\n\n"
+        for idx, ans in enumerate(group_answers):
+            head_prompt += f"[그룹{idx+1} 답변]\n{ans}\n\n"
+        head_prompt += f"\n사용자: {user_input}\n"
+        head_response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=head_prompt
+        )
+        final_answer = clean_text(head_response.text)
+    except Exception as e:
+        final_answer = f"Head AI 분석 중 오류가 발생했습니다: {str(e)}\n\n그룹별 분석 결과를 참고해주세요."
+        if ui_container:
+            st.error(f"⚠️ Head AI 오류: {str(e)}")
 
     if ui_container:
         progress_bar.progress(1.0, text="분석 완료!")
         st.success("✅ **모든 AI 분석이 완료되었습니다**")
         st.info("📋 **패널을 접고 아래에서 최종 답변을 확인하세요**")
 
-    return clean_text(head_response.text)
+    return final_answer
 
 
 def handle_overseas_hs(user_input, context, hs_manager, ui_container=None):
@@ -184,17 +194,87 @@ def handle_overseas_hs(user_input, context, hs_manager, ui_container=None):
 
 역할과 목표:
 - 미국 관세청(CBP)과 EU 관세청의 HS 분류 사례 분석
-- 국제 HS 분류 동향과 국내 분류와의 차이점 분석
-- WCO(세계관세기구) 기준과의 정합성 검토
+- 빈도수 기반 신뢰도 평가를 통한 체계적 분석
 
-답변 구성요소:
-1. **해외 분류 현황**: 미국/EU의 해당 품목 분류 현황
-2. **국제 비교**: 각국 분류 기준의 차이점과 공통점
-3. **국내 적용 가능성**: 해외 사례의 국내 도입 가능성
-4. **WTO/WCO 동향**: 국제기구의 관련 논의사항
-5. **무역실무 고려사항**: 수출입 시 주의할 분류 차이
+분석 프로세스 (미국/EU 각각 적용):
+1. **유사 사례 수집 및 그룹화**
+   - 사용자가 설명한 품목과 동일하거나 유사한 모든 분류 사례를 찾으세요
+   - 찾은 사례들을 HS코드별로 그룹화하세요
+   - 각 HS코드 그룹의 사례 개수(빈도수)를 집계하세요
 
-글로벌 무역 관점에서 포괄적으로 분석해주세요."""
+2. **후보군 선정**
+   - 빈도수가 가장 높은 최대 3개의 HS코드를 후보군으로 선정하세요
+   - 각 후보의 빈도수와 대표 사례를 명시하세요
+
+3. **최적 HS코드 선정**
+   - 후보군 중에서 다음 기준으로 가장 적합한 HS코드를 최종 선정하세요:
+     * 빈도수 (사례 개수)
+     * 품목 설명의 유사도 (재질, 용도, 형상, 기능 등)
+
+답변 구성 (반드시 아래 형식을 따르세요):
+
+# 미국(US) 분류 분석
+
+## 1. 최종 선정 HS코드
+**HS코드: [선정된 코드]**
+
+**선정 사유:**
+- 빈도수: [해당 코드의 사례 개수]건
+- 유사도 분석: [사용자 품목과의 구체적 유사점]
+- 대표 사례: [가장 유사한 1-2개 사례 간략 설명]
+- 선정 근거: [해당 코드의 사례에서 사용된 주요 품목분류 근거]
+
+## 2. 기타 후보 HS코드
+### 후보 1: HS코드 [두 번째 후보]
+- 빈도수: [사례 개수]건
+- 미선정 사유: [최종 코드 대비 부족한 점]
+
+### 후보 2: HS코드 [세 번째 후보] (있는 경우)
+- 빈도수: [사례 개수]건
+- 미선정 사유: [최종 코드 대비 부족한 점]
+
+## 3. 미국 분류 시 주의사항
+- [미국 수출 시 고려해야 할 요소]
+- [추가로 확인이 필요한 품목 특성]
+
+---
+
+# 유럽연합(EU) 분류 분석
+
+## 1. 최종 선정 HS코드
+**HS코드: [선정된 코드]**
+
+**선정 사유:**
+- 빈도수: [해당 코드의 사례 개수]건
+- 유사도 분석: [사용자 품목과의 구체적 유사점]
+- 대표 사례: [가장 유사한 1-2개 사례 간략 설명]
+- 선정 근거: [해당 코드의 사례에서 사용된 주요 품목분류 근거]
+
+## 2. 기타 후보 HS코드
+### 후보 1: HS코드 [두 번째 후보]
+- 빈도수: [사례 개수]건
+- 미선정 사유: [최종 코드 대비 부족한 점]
+
+### 후보 2: HS코드 [세 번째 후보] (있는 경우)
+- 빈도수: [사례 개수]건
+- 미선정 사유: [최종 코드 대비 부족한 점]
+
+## 3. EU 분류 시 주의사항
+- [EU 수출 시 고려해야 할 요소]
+- [추가로 확인이 필요한 품목 특성]
+
+---
+
+# 종합 분석
+
+## 미국/EU 분류 비교
+- [두 지역 분류의 공통점과 차이점]
+- [국제 HS 기준(WCO) 관점에서의 해석]
+
+## 한국 수출입 실무 고려사항
+- [수출입 신고 시 유의사항]
+
+글로벌 무역 관점에서 포괄적으로 분석하고, 빈도수와 유사도를 객관적으로 평가하여 신뢰도 높은 답변을 제공하세요."""
 
     # UI 컨테이너가 제공된 경우 실시간 표시
     if ui_container:
@@ -205,19 +285,23 @@ def handle_overseas_hs(user_input, context, hs_manager, ui_container=None):
 
     # 병렬 처리용 함수
     def process_single_group(i):
-        relevant = hs_manager.get_overseas_context_group(user_input, i)
-        prompt = f"{overseas_context}\n\n관련 데이터 (해외 관세청, 그룹{i+1}):\n{relevant}\n\n사용자: {user_input}\n"
+        try:
+            relevant = hs_manager.get_overseas_context_group(user_input, i)
+            prompt = f"{overseas_context}\n\n관련 데이터 (해외 관세청, 그룹{i+1}):\n{relevant}\n\n사용자: {user_input}\n"
 
-        start_time = datetime.now()
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=prompt
-        )
-        end_time = datetime.now()
-        processing_time = (end_time - start_time).total_seconds()
+            start_time = datetime.now()
+            response = client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=prompt
+            )
+            end_time = datetime.now()
+            processing_time = (end_time - start_time).total_seconds()
 
-        answer = clean_text(response.text)
-        return i, answer, start_time, processing_time
+            answer = clean_text(response.text)
+            return i, answer, start_time, processing_time
+        except Exception as e:
+            error_msg = f"그룹 {i+1} 분석 중 오류 발생: {str(e)}"
+            return i, error_msg, datetime.now(), 0.0
 
     # 5개 그룹 병렬 처리 (max_workers=3)
     if ui_container:
@@ -261,21 +345,27 @@ def handle_overseas_hs(user_input, context, hs_manager, ui_container=None):
         st.info("🧠 **Head AI가 모든 분석을 종합하는 중...**")
 
     # Head Agent가 5개 부분 답변을 취합하여 최종 답변 생성
-    head_prompt = f"{overseas_context}\n\n아래는 해외 HS 분류 사례 데이터 5개 그룹별 분석 결과입니다. 각 그룹의 답변을 종합하여 최종 전문가 답변을 작성하세요.\n\n"
-    for idx, ans in enumerate(group_answers):
-        head_prompt += f"[그룹{idx+1} 답변]\n{ans}\n\n"
-    head_prompt += f"\n사용자: {user_input}\n"
-    head_response = client.models.generate_content(
-        model="gemini-2.5-flash",
-        contents=head_prompt
-    )
+    try:
+        head_prompt = f"{overseas_context}\n\n아래는 해외 HS 분류 사례 데이터 5개 그룹별 분석 결과입니다. 각 그룹의 답변을 종합하여 최종 전문가 답변을 작성하세요.\n\n"
+        for idx, ans in enumerate(group_answers):
+            head_prompt += f"[그룹{idx+1} 답변]\n{ans}\n\n"
+        head_prompt += f"\n사용자: {user_input}\n"
+        head_response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=head_prompt
+        )
+        final_answer = clean_text(head_response.text)
+    except Exception as e:
+        final_answer = f"Head AI 분석 중 오류가 발생했습니다: {str(e)}\n\n그룹별 분석 결과를 참고해주세요."
+        if ui_container:
+            st.error(f"⚠️ Head AI 오류: {str(e)}")
 
     if ui_container:
         progress_bar.progress(1.0, text="분석 완료!")
         st.success("✅ **모든 AI 분석이 완료되었습니다**")
         st.info("📋 **패널을 접고 아래에서 최종 답변을 확인하세요**")
 
-    return clean_text(head_response.text)
+    return final_answer
 
 def handle_hs_manual_with_user_codes(user_input, context, hs_manager, logger, ui_container=None):
     """사용자 제시 HS코드 기반 해설서 분석"""
