@@ -1,5 +1,6 @@
 import streamlit as st
 from google import genai
+from google.genai.errors import APIError
 import time
 from datetime import datetime
 
@@ -510,5 +511,21 @@ with input_container:
                 # Force rerun to display the new chat messages
                 st.rerun()
                 
+            except APIError as e:
+                st.error("### Gemini API 오류 발생")
+                st.error(f"**오류 코드**: {e.code}")
+                st.error(f"**오류 메시지**: {e.message}")
+
+                if e.code == 503:
+                    st.warning("**해결 방법**: API 서버가 일시적으로 과부하 상태입니다. 잠시 후 다시 시도해주세요.")
+                elif e.code == 429:
+                    st.warning("**해결 방법**: API 사용량 한도를 초과했습니다. 잠시 후 다시 시도해주세요.")
+                elif e.code == 404:
+                    st.warning("**해결 방법**: 요청한 모델을 찾을 수 없습니다. 모델명을 확인해주세요.")
+                elif e.code == 400:
+                    st.warning("**해결 방법**: 잘못된 요청입니다. 입력 내용을 확인해주세요.")
+                else:
+                    st.warning("**해결 방법**: 문제가 지속되면 관리자에게 문의해주세요.")
+
             except Exception as e:
-                st.error(f"처리 중 오류가 발생했습니다: {str(e)}")
+                st.error(f"처리 중 예상치 못한 오류가 발생했습니다: {str(e)}")

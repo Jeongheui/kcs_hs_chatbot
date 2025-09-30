@@ -2,6 +2,7 @@ import json
 import re
 import os
 from google import genai
+from google.genai.errors import APIError
 from dotenv import load_dotenv
 from .text_utils import clean_text, general_explanation
 
@@ -134,6 +135,12 @@ HS코드: {code}
                         'summary_used': True
                     }
                     logger.log_actual("SUCCESS", f"HS{code} manual summarized", f"{len(manual_info[code]['content'])} chars")
+                except APIError as e:
+                    logger.log_actual("ERROR", f"HS{code} Gemini API error (code: {e.code})", e.message)
+                    manual_info[code] = {
+                        'content': full_content[:1000] + "...",
+                        'summary_used': False
+                    }
                 except Exception as e:
                     logger.log_actual("ERROR", f"HS{code} summary failed: {str(e)}")
                     manual_info[code] = {
@@ -249,5 +256,20 @@ def analyze_user_provided_codes(user_input, hs_codes, tariff_info, manual_info, 
             contents=analysis_prompt
         )
         return clean_text(response.text)
+    except APIError as e:
+        error_msg = f"Gemini API 오류가 발생했습니다.\n\n**오류 코드**: {e.code}\n**오류 메시지**: {e.message}\n\n"
+
+        if e.code == 503:
+            error_msg += "**해결 방법**: API 서버가 일시적으로 과부하 상태입니다. 잠시 후 다시 시도해주세요."
+        elif e.code == 429:
+            error_msg += "**해결 방법**: API 사용량 한도를 초과했습니다. 잠시 후 다시 시도해주세요."
+        elif e.code == 404:
+            error_msg += "**해결 방법**: 요청한 모델을 찾을 수 없습니다."
+        elif e.code == 400:
+            error_msg += "**해결 방법**: 잘못된 요청입니다. 입력 내용을 확인해주세요."
+        else:
+            error_msg += "**해결 방법**: 문제가 지속되면 관리자에게 문의해주세요."
+
+        return error_msg
     except Exception as e:
-        return f"AI 분석 중 오류가 발생했습니다: {str(e)}"
+        return f"처리 중 예상치 못한 오류가 발생했습니다.\n\n**오류 내용**: {str(e)}\n\n관리자에게 문의해주세요."

@@ -4,6 +4,7 @@ import os
 from datetime import datetime
 from google import genai
 from google.genai import types
+from google.genai.errors import APIError
 from dotenv import load_dotenv
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -36,7 +37,7 @@ def handle_web_search(user_input, context, hs_manager):
     prompt = f"{web_context}\n\n사용자: {user_input}\n"
 
     response = client.models.generate_content(
-        model="gemini-2.5-flash",
+        model="gemini-2.0-flash",
         contents=prompt,
         config=config)
 
@@ -491,6 +492,10 @@ HS코드: {result['hs_code']}
                 )
                 result['manual_summary'] = clean_text(summary_response.text)
                 logger.log_actual("SUCCESS", f"HS코드 {result['hs_code']} 해설서 요약 완료", f"{len(result['manual_summary'])} chars")
+            except APIError as e:
+                error_msg = f"Gemini API 오류 (코드: {e.code}): {e.message}"
+                logger.log_actual("ERROR", f"HS코드 {result['hs_code']} 요약 실패", error_msg)
+                result['manual_summary'] = result['manual_content'][:1000] + "..." if len(result['manual_content']) > 1000 else result['manual_content']
             except Exception as e:
                 logger.log_actual("ERROR", f"HS코드 {result['hs_code']} 요약 실패: {str(e)}")
                 result['manual_summary'] = result['manual_content'][:1000] + "..." if len(result['manual_content']) > 1000 else result['manual_content']
@@ -602,16 +607,40 @@ HS코드: {result['hs_code']}
     logger.log_actual("AI", "Processing with enhanced parallel search context...")
     ai_processing_start = time.time()
 
-    response = client.models.generate_content(
-        model="gemini-2.5-flash",
-        contents=prompt
-    )
+    try:
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt
+        )
+        ai_processing_time = time.time() - ai_processing_start
+        final_answer = clean_text(response.text)
 
-    ai_processing_time = time.time() - ai_processing_start
-    final_answer = clean_text(response.text)
+        logger.log_actual("SUCCESS", "Gemini processing completed",
+                         f"{ai_processing_time:.2f}s, input: {len(prompt)} chars, output: {len(final_answer)} chars")
 
-    logger.log_actual("SUCCESS", "Gemini processing completed",
-                     f"{ai_processing_time:.2f}s, input: {len(prompt)} chars, output: {len(final_answer)} chars")
+    except APIError as e:
+        ai_processing_time = time.time() - ai_processing_start
+        error_msg = f"Gemini API 오류가 발생했습니다.\n\n**오류 코드**: {e.code}\n**오류 메시지**: {e.message}\n\n"
+
+        if e.code == 503:
+            error_msg += "**해결 방법**: API 서버가 일시적으로 과부하 상태입니다. 잠시 후 다시 시도해주세요."
+        elif e.code == 429:
+            error_msg += "**해결 방법**: API 사용량 한도를 초과했습니다. 잠시 후 다시 시도해주세요."
+        elif e.code == 404:
+            error_msg += "**해결 방법**: 요청한 모델을 찾을 수 없습니다. 모델명을 확인해주세요."
+        elif e.code == 400:
+            error_msg += "**해결 방법**: 잘못된 요청입니다. 입력 내용을 확인해주세요."
+        else:
+            error_msg += "**해결 방법**: 문제가 지속되면 관리자에게 문의해주세요."
+
+        logger.log_actual("ERROR", f"Gemini API error (code: {e.code})", e.message)
+        final_answer = error_msg
+
+    except Exception as e:
+        ai_processing_time = time.time() - ai_processing_start
+        error_msg = f"처리 중 예상치 못한 오류가 발생했습니다.\n\n**오류 내용**: {str(e)}\n\n관리자에게 문의해주세요."
+        logger.log_actual("ERROR", f"Unexpected error during AI processing: {str(e)}")
+        final_answer = error_msg
 
     # UI 최종 완료 표시
     if ui_container:
