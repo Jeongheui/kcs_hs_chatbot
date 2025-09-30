@@ -339,27 +339,24 @@ def handle_overseas_hs(user_input, context, hs_manager, ui_container=None):
 
     return final_answer
 
-def handle_hs_manual_with_user_codes(user_input, context, hs_manager, logger, ui_container=None):
-    """사용자 제시 HS코드 기반 해설서 분석"""
+def handle_hs_manual_with_user_codes(user_input, context, hs_manager, logger, extracted_codes, ui_container=None):
+    """사용자 제시 HS코드 기반 해설서 분석
+
+    Args:
+        user_input: 사용자 질문
+        context: 대화 컨텍스트
+        hs_manager: HS 데이터 매니저
+        logger: 로거
+        extracted_codes: 이미 추출된 HS코드 리스트 (main.py에서 전달)
+        ui_container: UI 컨테이너 (optional)
+    """
 
     # UI 컨테이너가 제공된 경우 분석 과정 표시
     if ui_container:
         with ui_container:
             st.info("🔍 **사용자 제시 HS코드 분석 시작**")
-            progress_bar = st.progress(0, text="HS코드 추출 중...")
+            progress_bar = st.progress(0, text="HS코드 분석 중...")
             analysis_container = st.container()
-
-    # 1단계: 사용자 제시 HS코드 추출
-    logger.log_actual("INFO", "Extracting user-provided HS codes...")
-    extracted_codes = extract_hs_codes(user_input)
-
-    if not extracted_codes:
-        logger.log_actual("ERROR", "No HS codes found in user input")
-        if ui_container:
-            progress_bar.progress(1.0, text="분석 완료!")
-            st.error("❌ **HS코드를 찾을 수 없습니다**")
-            st.info("💡 **사용법**: '3923, 3924, 3926 중에서 플라스틱 용기를 분류해주세요' 형태로 질문하세요")
-        return "HS코드를 찾을 수 없습니다. 분석할 HS코드를 포함하여 질문해주세요."
 
     logger.log_actual("SUCCESS", f"Found {len(extracted_codes)} HS codes", f"{', '.join(extracted_codes)}")
 
@@ -552,27 +549,45 @@ HS코드: {result['hs_code']}
     # HS 해설서 분석 전용 컨텍스트
     manual_context = """당신은 HS 해설서 및 관세율표 전문 분석가입니다.
 
-역할과 목표:
-- 관세율표(품목번호, 한글품명, 영문품명)와 HS 해설서의 병렬 분석
-- 관세율표 기반 유사도 검색과 해설서 텍스트 분석의 통합
-- 부(部)-류(類)-호(號) 체계와 관세율표 품목명의 정합성 판단
+당신이 받는 데이터:
+- 병렬 검색 시스템이 이미 완료한 상위 3개 HS코드 후보
+- 각 후보는 관세율표 검색(40% 가중치) + 해설서 검색(60% 가중치) 결과를 통합한 것입니다
+- confidence: HIGH(양쪽 검색에서 발견) / MEDIUM(한쪽만 발견)
+- sources: 'tariff_to_manual'(관세율표 경로), 'direct_manual'(해설서 직접 경로)
+- manual_summary: 해설서 요약본 (우선 참고)
 
-병렬 검색 시스템:
-- **관세율표 검색**: hstable.json의 품목명 유사도 매칭 (40% 가중치)
-- **해설서 검색**: HS 해설서 본문 텍스트 분석 (60% 가중치)
-- **통합 분석**: 두 검색 결과의 교차 검증과 신뢰도 평가
+분석 프로세스:
+1. **후보 평가**: 3개 후보를 신뢰도(HIGH 우선) + 해설서 적합성으로 평가
+2. **최적 선정**: 최고 신뢰도 후보 중 사용자 품목과 가장 일치하는 코드 선정
+3. **근거 작성**: 관세율표 품목명 + 해설서 내용을 통합하여 설명
 
 주의사항:
 - 답변 시 반드시 출처를 명시하세요 (예: "제39류 HS 해설서에 따르면...", "호 3923 해설서에 따르면...")
-- 사용자가 자료에 없는 내용을 물어볼 경우, 반드시 "해당 정보는 HS 해설서에 없습니다" 또는 "확인된 자료가 없습니다"라고 답변하세요
+- 자료에 없는 내용은 "해당 정보는 HS 해설서에 없습니다"라고 답변하세요
 
-답변 구성요소:
-1. **최적 HS코드 추천**: 병렬 검색 결과 기반 최고 신뢰도 코드
-2. **관세율표 매칭**: 유사 품목명과 매칭도 분석
-3. **해설서 근거**: 해당 부-류-호 해설서의 정확한 적용
-4. **종합 판단**: 관세율표와 해설서 분석의 일치성 검토
+답변 형식 (반드시 아래 구조를 따르세요):
 
-관세율표 품목명과 HS 해설서를 모두 활용하여 정확한 분류를 제시해주세요."""
+## 1. 최종 추천 HS코드
+**HS코드: [코드]**
+
+**선정 사유:**
+- 신뢰도: [HIGH/MEDIUM] (검색 경로: [sources 내용])
+- 관세율표 품목명: [tariff_name]
+- 해설서 근거: [manual_summary 핵심 내용]
+- 적합성 분석: [사용자 품목과의 일치점]
+
+## 2. 기타 후보 HS코드
+### 후보 2: HS코드 [두 번째]
+- 신뢰도: [HIGH/MEDIUM]
+- 미선정 사유: [최종 코드 대비 부족한 점]
+
+### 후보 3: HS코드 [세 번째]
+- 신뢰도: [HIGH/MEDIUM]
+- 미선정 사유: [최종 코드 대비 부족한 점]
+
+## 3. 분류 시 주의사항
+- [실무 적용 시 확인 필요 사항]
+- [유사 품목과의 구분 기준]"""
 
     # Gemini에 전달할 프롬프트 구성
     prompt = f"""{manual_context}
@@ -581,24 +596,6 @@ HS코드: {result['hs_code']}
 {enhanced_context}
 
 사용자 질문: {user_input}
-
-위의 병렬 검색 결과를 바탕으로 다음을 포함하여 답변해주세요:
-
-1. **가장 적합한 HS 코드 추천**
-   - 최고 신뢰도의 HS코드와 그 근거
-   - 관세율표 품목명과 해설서 설명 종합
-
-2. **분류 근거 및 분석**
-   - 관세율표 기반 검색 결과
-   - 해설서 기반 검색 결과
-   - 두 검색 경로의 일치성 분석
-
-3. **추가 고려사항**
-   - 유사 품목과의 구분 기준
-   - 분류 시 주의점
-   - 필요 시 추가 정보 요청 사항
-
-답변은 전문적이면서도 이해하기 쉽게 작성해주세요.
 """
 
     # Gemini 처리

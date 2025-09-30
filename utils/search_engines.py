@@ -287,9 +287,9 @@ class ParallelHSSearcher:
         logger.log_actual("SUCCESS", f"Results consolidation completed",
                          f"{len(sorted_results)} unique HS codes in {consolidation_time:.2f}s")
 
-        # 상위 5개 결과 반환
+        # 상위 3개 결과 반환
         top_results = []
-        for hs_code, final_score in sorted_results[:5]:
+        for hs_code, final_score in sorted_results[:3]:
             if hs_code in result_details:
                 details = result_details[hs_code]
                 details['final_score'] = final_score

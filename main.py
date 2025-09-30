@@ -168,11 +168,27 @@ def process_query_with_real_logging(user_input):
             answer = "\n\n +++ 해외 HS 분류 검색 실시 +++\n\n" + final_answer
             
         elif q_type == "hs_manual":
-            logger.log_actual("AI", "Starting enhanced parallel HS manual analysis...")
-            ai_start = time.time()
-            answer = "\n\n +++ HS 해설서 분석 실시 (병렬 검색) +++ \n\n" + handle_hs_manual_with_parallel_search(user_input, st.session_state.context, hs_manager, logger)
-            ai_time = time.time() - ai_start
-            logger.log_actual("SUCCESS", "Enhanced HS manual analysis completed", f"{ai_time:.2f}s, {len(answer)} chars")
+            # 1단계: HS코드 추출 시도
+            logger.log_actual("INFO", "Checking for user-provided HS codes...")
+            extracted_codes = extract_hs_codes(user_input)
+            logger.log_actual("INFO", f"Extracted codes: {extracted_codes if extracted_codes else 'None'}")
+
+            if extracted_codes:
+                # 사용자가 HS코드를 제시한 경우 → 코드 비교 분석
+                logger.log_actual("SUCCESS", f"Found {len(extracted_codes)} user-provided HS codes", ", ".join(extracted_codes))
+                logger.log_actual("AI", "Starting user-provided codes comparison analysis...")
+                ai_start = time.time()
+                answer = "\n\n +++ HS 해설서 분석 실시 (사용자 제시 코드 비교) +++ \n\n" + handle_hs_manual_with_user_codes(user_input, st.session_state.context, hs_manager, logger, extracted_codes)
+                ai_time = time.time() - ai_start
+                logger.log_actual("SUCCESS", "User-provided codes analysis completed", f"{ai_time:.2f}s, {len(answer)} chars")
+            else:
+                # HS코드 없는 경우 → 병렬 검색
+                logger.log_actual("INFO", "No HS codes found, starting parallel search...")
+                logger.log_actual("AI", "Starting enhanced parallel HS manual analysis...")
+                ai_start = time.time()
+                answer = "\n\n +++ HS 해설서 분석 실시 (병렬 검색) +++ \n\n" + handle_hs_manual_with_parallel_search(user_input, st.session_state.context, hs_manager, logger)
+                ai_time = time.time() - ai_start
+                logger.log_actual("SUCCESS", "Enhanced HS manual analysis completed", f"{ai_time:.2f}s, {len(answer)} chars")
             
         elif q_type == "hs_manual_raw":
             logger.log_actual("SEARCH", "Extracting HS codes...")
@@ -451,14 +467,22 @@ with input_container:
             try:
                 # 분석 과정 표시 방식 분기
                 if selected_category == "HS해설서분석":
-                    # HS 해설서 분석은 사용자 제시 코드 기반 분석 (더미 로거 생성)
+                    # HS 해설서 분석은 HS코드 유무에 따라 분기
                     class DummyLogger:
                         def log_actual(self, level, message, data=None):
                             pass  # UI 표시용이므로 로깅은 생략
-                    
+
                     dummy_logger = DummyLogger()
-                    final_answer = handle_hs_manual_with_user_codes(user_input, st.session_state.context, hs_manager, dummy_logger, analysis_expander)
-                    answer = "\n\n +++ HS 해설서 분석 실시 (사용자 제시 코드) +++ \n\n" + final_answer
+                    extracted_codes = extract_hs_codes(user_input)
+
+                    if extracted_codes:
+                        # HS코드가 있으면 사용자 제시 코드 비교 분석
+                        final_answer = handle_hs_manual_with_user_codes(user_input, st.session_state.context, hs_manager, dummy_logger, extracted_codes, analysis_expander)
+                        answer = "\n\n +++ HS 해설서 분석 실시 (사용자 제시 코드 비교) +++ \n\n" + final_answer
+                    else:
+                        # HS코드가 없으면 병렬 검색
+                        final_answer = handle_hs_manual_with_parallel_search(user_input, st.session_state.context, hs_manager, dummy_logger, analysis_expander)
+                        answer = "\n\n +++ HS 해설서 분석 실시 (병렬 검색) +++ \n\n" + final_answer
                 elif selected_category not in ["국내HS분류사례 검색", "해외HS분류사례검색"]:
                     # 기타 유형은 로그 패널 표시
                     with st.expander("실시간 처리 과정 로그 보기", expanded=True):
