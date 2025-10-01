@@ -39,8 +39,7 @@ from .handlers import (
     handle_web_search,
     handle_hs_classification_cases,
     handle_overseas_hs,
-    handle_hs_manual_with_user_codes,
-    handle_hs_manual_with_parallel_search
+    handle_hs_manual_with_user_codes
 )
 
 __all__ = [
@@ -68,8 +67,7 @@ __all__ = [
     'handle_web_search',
     'handle_hs_classification_cases',
     'handle_overseas_hs',
-    'handle_hs_manual_with_user_codes',
-    'handle_hs_manual_with_parallel_search'
+    'handle_hs_manual_with_user_codes'
 ]
 
 __version__ = '2.0.0'
