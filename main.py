@@ -361,62 +361,11 @@ selected_category = st.radio(
 # 카테고리명은 그대로 사용
 st.session_state.selected_category = selected_category
 
-# 선택된 유형에 따른 상세 설명 및 예시 표시
-category_info = {
-    "웹 검색": {
-        "icon": "🌐",
-        "title": "Google Search API",
-        "description": "품목의 일반 정보, 시장 동향, 기술 개발 검색",
-        "examples": "예: 반도체 시장 동향, 전기차 배터리 최신 기술"
-    },
-    "국내 HS분류사례 검색": {
-        "icon": "🇰🇷",
-        "title": "관세청 분류사례 987건",
-        "description": "Multi-Agent 시스템으로 최적 HS코드 추천",
-        "examples": "예: 플라스틱 용기 HS코드, 자동차 부품 분류"
-    },
-    "해외 HS분류사례 검색": {
-        "icon": "🌍",
-        "title": "미국/EU 분류사례 1,900건",
-        "description": "글로벌 분류 기준 비교 분석",
-        "examples": "예: 미국 전자제품 분류, EU 화학제품 사례"
-    },
-    "HS해설서 분석(품명 + 후보 HS코드)": {
-        "icon": "📚",
-        "title": "HS 해설서 + 통칙",
-        "description": "여러 HS코드 심층 비교 분석",
-        "examples": "예: 3923.30과 3926.90 중 플라스틱 용기는?",
-        "note": "주의: 반드시 비교할 HS코드를 질문에 포함해야 합니다."
-    },
-    "HS해설서 원문 검색(HS코드만 입력)": {
-        "icon": "📖",
-        "title": "HS 해설서 원문",
-        "description": "특정 HS코드의 원문을 체계적으로 제공",
-        "examples": "예: 3911, 391190, 8471"
-    },
-    "AI 자동분류": {
-        "icon": "🤖",
-        "title": "자동 질문 분류",
-        "description": "LLM이 최적 분석 방식을 자동 선택",
-        "examples": "예: 플라스틱 용기 분류, 반도체 동향 등 자유롭게 질문"
-    }
-}
-
-info = category_info[selected_category]
-
-# 선택된 유형 정보를 라디오 버튼 아래에 카드 형식으로 표시
-st.markdown(f"""
-<div style='background-color: #F0F9FF; padding: 12px 16px; border-radius: 8px; border-left: 4px solid #3B82F6; margin-bottom: 16px;'>
-    <h5 style='margin: 0 0 6px 0; color: #1E40AF;'>{info['icon']} {selected_category} ({info['title']})</h5>
-    <p style='margin: 0; font-size: 14px; font-style: italic; color: #4B5563;'>{info['examples']}</p>
-</div>
-""", unsafe_allow_html=True)
-
 # 특수 케이스 주의사항 표시
 if selected_category == "HS해설서 분석(품명 + 후보 HS코드)":
-    st.warning(info.get('note', ''))
+    st.warning("주의: 반드시 비교할 HS코드를 질문에 포함해야 합니다.")
 
-st.divider()  # 구분선 추가
+st.markdown("<div style='margin-bottom: 8px;'></div>", unsafe_allow_html=True)  # 간격 축소
 
 # 채팅 기록 표시
 for message in st.session_state.chat_history:
@@ -475,20 +424,61 @@ st.markdown("<div style='flex: 1;'></div>", unsafe_allow_html=True)
 with input_container:
     # Form을 사용하여 안정적인 입력 처리
     with st.form("query_form", clear_on_submit=True):
-        # 선택된 유형에 따른 placeholder 메시지
-        placeholders = {
-            "웹 검색": "예: '반도체 시장 동향', '전기차 산업 현황'",
-            "국내 HS분류사례 검색": "예: '플라스틱 용기 HS코드', '자동차 부품 분류'",
-            "해외 HS분류사례 검색": "예: '미국 전자제품 분류', 'EU 화학제품 사례'",
-            "HS해설서 분석(품명 + 후보 HS코드)": "예: '3923.30과 3926.90 중 플라스틱 용기 분류는?'",
-            "HS해설서 원문 검색(HS코드만 입력)": "예: '3911' 또는 '391190' (HS코드만 입력)",
-            "AI 자동분류": "예: '플라스틱 용기 분류', '반도체 동향' 등 자유롭게 질문하세요"
+        # 선택된 유형에 따른 예시 질문 3개씩
+        example_questions = {
+            "웹 검색": [
+                "반도체 시장 동향과 주요 수출국은?",
+                "전기차 배터리 최신 기술 개발 현황은?",
+                "AI 칩셋 산업의 글로벌 경쟁 구도는?"
+            ],
+            "국내 HS분류사례 검색": [
+                "플라스틱 용기의 HS코드는?",
+                "자동차 엔진 부품은 어떻게 분류되나요?",
+                "LED 조명 장치의 HS코드를 알려주세요"
+            ],
+            "해외 HS분류사례 검색": [
+                "미국에서 전자제품은 어떻게 분류하나요?",
+                "EU의 화학제품 분류 기준은?",
+                "스마트워치의 해외 분류 사례를 알려주세요"
+            ],
+            "HS해설서 분석(품명 + 후보 HS코드)": [
+                "3923.30과 3926.90 중 플라스틱 용기는?",
+                "8471.30과 8471.50 중 노트북은 어디에 해당하나요?",
+                "9113.90과 3926.90 중 스마트워치 밴드는?"
+            ],
+            "HS해설서 원문 검색(HS코드만 입력)": [
+                "3911",
+                "391190",
+                "8471"
+            ],
+            "AI 자동분류": [
+                "플라스틱 용기는 어떻게 분류되나요?",
+                "반도체 시장 동향을 알려주세요",
+                "미국의 전자제품 분류 사례는?"
+            ]
         }
-        
+
+        # 선택된 카테고리의 예시 질문들
+        examples = example_questions.get(st.session_state.selected_category, [])
+
+        # 예시 질문 버튼 표시 (3개를 가로로 배치)
+        if examples:
+            st.markdown("**💡 예시 질문:**")
+            cols = st.columns(3)
+            for idx, example in enumerate(examples):
+                with cols[idx]:
+                    if st.form_submit_button(f"📌 {example}", use_container_width=True, key=f"example_{idx}"):
+                        st.session_state.selected_example = example
+
         user_input = st.text_input(
-            "품목에 대해 질문하세요:", 
-            placeholder=placeholders.get(st.session_state.selected_category, "여기에 입력 후 Enter 또는 전송 버튼 클릭")
+            "품목에 대해 질문하세요:",
+            value=st.session_state.get('selected_example', ''),
+            placeholder="여기에 입력 후 Enter 또는 전송 버튼 클릭"
         )
+
+        # 예시 선택 후 초기화
+        if 'selected_example' in st.session_state:
+            del st.session_state.selected_example
         
         # 두 개의 컬럼으로 나누어 버튼을 오른쪽에 배치
         col1, col2 = st.columns([4, 1])
