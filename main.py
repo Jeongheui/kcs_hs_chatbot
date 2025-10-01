@@ -7,7 +7,7 @@ from datetime import datetime
 import os
 from dotenv import load_dotenv
 from utils import HSDataManager, extract_hs_codes, clean_text, classify_question
-from utils import handle_web_search, handle_hs_classification_cases, handle_overseas_hs, get_hs_explanations, handle_hs_manual_with_parallel_search, handle_hs_manual_with_user_codes
+from utils import handle_web_search, handle_hs_classification_cases, handle_overseas_hs, get_hs_explanations, handle_hs_manual_with_user_codes
 
 # 환경 변수 로드 (.env 파일에서 API 키 등 설정값 로드)
 load_dotenv()
@@ -183,13 +183,9 @@ def process_query_with_real_logging(user_input):
                 ai_time = time.time() - ai_start
                 logger.log_actual("SUCCESS", "User-provided codes analysis completed", f"{ai_time:.2f}s, {len(answer)} chars")
             else:
-                # HS코드 없는 경우 → 병렬 검색
-                logger.log_actual("INFO", "No HS codes found, starting parallel search...")
-                logger.log_actual("AI", "Starting enhanced parallel HS manual analysis...")
-                ai_start = time.time()
-                answer = "\n\n +++ HS 해설서 분석 실시 (병렬 검색) +++ \n\n" + handle_hs_manual_with_parallel_search(user_input, st.session_state.context, hs_manager, logger)
-                ai_time = time.time() - ai_start
-                logger.log_actual("SUCCESS", "Enhanced HS manual analysis completed", f"{ai_time:.2f}s, {len(answer)} chars")
+                # HS코드 없는 경우 → 에러 메시지
+                logger.log_actual("ERROR", "No HS codes found in user input")
+                answer = "해설서 분석 모드에서는 반드시 HS 코드를 제시해야 합니다.\n\n예시: '3923.30과 3926.90 중 어느 것이 맞나요?'"
             
         elif q_type == "hs_manual_raw":
             logger.log_actual("SEARCH", "Extracting HS codes...")
@@ -245,11 +241,12 @@ with st.sidebar:
     - 국제 분류 동향 비교 분석
 
     **📚 HS 해설서 분석** ⭐
-    - **사용자 제시 코드 비교 시스템**
+    - **사용자가 반드시 HS 코드를 제시해야 함**
     - 각 HS코드별 품목분류표 + 해설서 분석
     - 통칙 기반 체계적 비교
     - Gemini AI 최적 코드 추천
     - 실시간 프로세스 표시
+    - 예: "3923.30과 3926.90 중 어느 것이 맞나요?"
 
     **📖 HS 해설서 원문**
     - 특정 HS코드 해설서 조회
@@ -305,7 +302,7 @@ selected_category = st.radio(
         "웹검색 (물품개요, 시장동향, 뉴스, 산업현황 검색)", 
         "국내HS분류사례 검색 (관세청 분류사례 기반 HS코드 추천)",
         "해외HS분류사례검색 (미국/EU 분류사례 비교분석)",
-        "HS해설서분석 (사용자 제시 HS코드들을 비교분석하여 최적 코드 추천)",
+        "HS해설서분석 (사용자가 제시한 HS코드들을 비교분석하여 최적 코드 추천)",
         "HS해설서원문검색 (특정 HS코드의 해설서 원문 조회)"
     ],
     index=0,  # 기본값: AI자동분류
@@ -319,7 +316,7 @@ category_mapping = {
     "웹검색 (물품개요, 시장동향, 뉴스, 산업현황 검색)": "웹검색",
     "국내HS분류사례 검색 (관세청 분류사례 기반 HS코드 추천)": "국내HS분류사례 검색",
     "해외HS분류사례검색 (미국/EU 분류사례 비교분석)": "해외HS분류사례검색",
-    "HS해설서분석 (사용자 제시 HS코드들을 비교분석하여 최적 코드 추천)": "HS해설서분석",
+    "HS해설서분석 (사용자가 제시한 HS코드들을 비교분석하여 최적 코드 추천)": "HS해설서분석",
     "HS해설서원문검색 (특정 HS코드의 해설서 원문 조회)": "HS해설서원문검색"
 }
 actual_category = category_mapping[selected_category]
@@ -331,7 +328,7 @@ example_messages = {
     "웹검색": "💡 **예시**: '반도체 시장 동향', '전기차 배터리 최신 기술', 'AI 칩셋 산업 현황'",
     "국내HS분류사례 검색": "💡 **예시**: '플라스틱 용기는 어떤 HS코드로 분류되나요?', '자동차 엔진 부품의 HS코드', '화장품 용기 분류'",
     "해외HS분류사례검색": "💡 **예시**: '미국에서 전자제품 분류 기준', 'EU 화학제품 분류사례', '해외 의료기기 분류 동향'",
-    "HS해설서분석": "💡 **예시**: '3923, 3924, 3926 중에서 플라스틱 용기 분류', '8471, 8472 중 컴퓨터 부품 분류', '6203, 6204, 6211 중 의류 분류'",
+    "HS해설서분석": "💡 **예시**: '3923.30과 3926.90 중에서 플라스틱 용기 분류는 무엇인가요?', '8471.30, 8471.50 중 노트북은 어디에 분류되나요?'",
     "HS해설서원문검색": "💡 **예시**: '3911', '391190', '8471' (HS코드만 입력하세요)"
 }
 
@@ -347,7 +344,7 @@ for message in st.session_state.chat_history:
                    </div>""", unsafe_allow_html=True)
     else:
         # 분석 과정이 있는 경우 expander 표시
-        if any(keyword in message['content'] for keyword in ["+++ HS 분류사례 검색 실시 +++", "+++ 해외 HS 분류 검색 실시 +++", "+++ HS 해설서 분석 실시 (병렬 검색) +++", "+++ HS 해설서 분석 실시 (사용자 제시 코드) +++"]):
+        if any(keyword in message['content'] for keyword in ["+++ HS 분류사례 검색 실시 +++", "+++ 해외 HS 분류 검색 실시 +++", "+++ HS 해설서 분석 실시 (사용자 제시 코드) +++"]):
             # AI 분석 과정 expander 표시 (채팅 기록에서도 항상 표시)
             with st.expander("🔍 **AI 분석 과정 보기**", expanded=False):
                 if "+++ HS 해설서 분석 실시 (사용자 제시 코드) +++" in message['content']:
@@ -361,42 +358,6 @@ for message in st.session_state.chat_history:
                     4. 📋 HS 분류 통칙 준비
                     5. 🧠 최종 AI 비교 분석 (Gemini 2.5)
                     """)
-                elif "+++ HS 해설서 분석 실시 (병렬 검색) +++" in message['content']:
-                    # HS 해설서 분석의 경우 - 저장된 분석 결과 표시
-                    if hasattr(st.session_state, 'hs_manual_analysis_results') and st.session_state.hs_manual_analysis_results:
-                        # 가장 최근 분석 결과 표시
-                        latest_result = st.session_state.hs_manual_analysis_results[-1]
-                        search_results = latest_result.get('search_results', [])
-                        
-                        st.success("✅ **병렬 검색 완료**")
-                        st.markdown("### 🎯 **상위 HS코드 후보**")
-                        
-                        for i, result in enumerate(search_results, 1):
-                            confidence_color = "🟢" if result['confidence'] == 'HIGH' else "🟡"
-                            st.markdown(f"{confidence_color} **후보 {i}: HS코드 {result['hs_code']}** (신뢰도: {result['confidence']})")
-                            
-                            col1, col2 = st.columns([1, 2])
-                            with col1:
-                                st.write(f"**최종점수**: {result['final_score']:.3f}")
-                                st.write(f"**검색경로**: {', '.join(result['sources'])}")
-                            with col2:
-                                if result['tariff_name']:
-                                    st.write(f"**관세율표 품목명**: {result['tariff_name']}")
-                                if result.get('manual_summary'):
-                                    st.write(f"**📖 해설서 요약**:")
-                                    st.text(result['manual_summary'][:200] + "...")
-                            
-                            st.divider()
-                    else:
-                        st.info("🔍 **병렬 검색 시스템으로 분석되었습니다**")
-                        st.markdown("""
-                        **분석 과정:**
-                        1. 📊 관세율표 유사도 검색 (40% 가중치)
-                        2. 📚 해설서 직접 검색 (60% 가중치)  
-                        3. 🤖 각 후보 해설서 내용 요약 (Gemini 2.0)
-                        4. 🧠 통합 분석 및 최종 추천 (Gemini 2.5)
-                        5. ✅ 신뢰도 평가 (HIGH/MEDIUM)
-                        """)
                 elif st.session_state.ai_analysis_results:
                     # Multi-Agent 분석의 경우 - 저장된 결과 표시
                     for result in st.session_state.ai_analysis_results:
@@ -438,7 +399,7 @@ with input_container:
             "웹검색": "예: '반도체 시장 동향', '전기차 산업 현황'",
             "국내HS분류사례 검색": "예: '플라스틱 용기 HS코드', '자동차 부품 분류'",
             "해외HS분류사례검색": "예: '미국 전자제품 분류', 'EU 화학제품 사례'",
-            "HS해설서분석": "예: '3923, 3924, 3926 중 플라스틱 용기 분류', '8471, 8472 중 컴퓨터 분류'",
+            "HS해설서분석": "예: '3923.30과 3926.90 중 플라스틱 용기 분류는?', '8471.30과 8471.50 중 노트북은?'",
             "HS해설서원문검색": "예: '3911' 또는 '391190' (HS코드만 입력)"
         }
         
@@ -481,9 +442,8 @@ with input_container:
                         final_answer = handle_hs_manual_with_user_codes(user_input, st.session_state.context, hs_manager, dummy_logger, extracted_codes, analysis_expander)
                         answer = "\n\n +++ HS 해설서 분석 실시 (사용자 제시 코드 비교) +++ \n\n" + final_answer
                     else:
-                        # HS코드가 없으면 병렬 검색
-                        final_answer = handle_hs_manual_with_parallel_search(user_input, st.session_state.context, hs_manager, dummy_logger, analysis_expander)
-                        answer = "\n\n +++ HS 해설서 분석 실시 (병렬 검색) +++ \n\n" + final_answer
+                        # HS코드가 없으면 에러 메시지
+                        answer = "해설서 분석 모드에서는 반드시 HS 코드를 제시해야 합니다.\n\n예시: '3923.30과 3926.90 중 어느 것이 맞나요?'"
                 elif selected_category not in ["국내HS분류사례 검색", "해외HS분류사례검색"]:
                     # 기타 유형은 로그 패널 표시
                     with st.expander("실시간 처리 과정 로그 보기", expanded=True):
