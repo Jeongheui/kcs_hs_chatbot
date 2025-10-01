@@ -422,63 +422,56 @@ input_container = st.container()
 st.markdown("<div style='flex: 1;'></div>", unsafe_allow_html=True)
 
 with input_container:
+    # 선택된 유형에 따른 예시 질문 3개씩 (실제 데이터 기반)
+    example_questions = {
+        "웹 검색": [
+            "전기차 배터리 최신 기술 개발 현황은?",
+            "반도체 시장 동향과 주요 수출국은?",
+            "수소연료전지의 글로벌 시장 전망은?"
+        ],
+        "국내 HS분류사례 검색": [
+            "섬유유연제의 HS코드는?",
+            "폴리아미드로 만든 자동차 브레이크 호스는 어떻게 분류되나요?",
+            "알루미늄 드릴 홀더 어댑터의 HS코드를 알려주세요"
+        ],
+        "해외 HS분류사례 검색": [
+            "미국에서 파티 장식용품은 어떻게 분류하나요?",
+            "EU의 플라스틱 백 분류 기준은?",
+            "의료기기의 해외 분류 사례를 알려주세요"
+        ],
+        "HS해설서 분석(품명 + 후보 HS코드)": [
+            "3809.91과 5603 중 섬유유연제 시트는?",
+            "3917.32와 4009 중 폴리아미드 호스는?",
+            "7616.99와 8466 중 알루미늄 어댑터는?"
+        ],
+        "HS해설서 원문 검색(HS코드만 입력)": [
+            "3809",
+            "3917",
+            "9027"
+        ],
+        "AI 자동분류": [
+            "섬유유연제 시트는 어떻게 분류되나요?",
+            "자동차 브레이크용 관의 HS코드는?",
+            "분석기기용 큐벳의 분류 사례를 알려주세요"
+        ]
+    }
+
+    # 선택된 카테고리의 예시 질문들 (텍스트로만 표시)
+    examples = example_questions.get(st.session_state.selected_category, [])
+
+    if examples:
+        st.markdown("**💡 예시 질문:**")
+        cols = st.columns(3)
+        for idx, example in enumerate(examples):
+            with cols[idx]:
+                st.markdown(f"📌 {example}")
+
     # Form을 사용하여 안정적인 입력 처리
     with st.form("query_form", clear_on_submit=True):
-        # 선택된 유형에 따른 예시 질문 3개씩
-        example_questions = {
-            "웹 검색": [
-                "반도체 시장 동향과 주요 수출국은?",
-                "전기차 배터리 최신 기술 개발 현황은?",
-                "AI 칩셋 산업의 글로벌 경쟁 구도는?"
-            ],
-            "국내 HS분류사례 검색": [
-                "플라스틱 용기의 HS코드는?",
-                "자동차 엔진 부품은 어떻게 분류되나요?",
-                "LED 조명 장치의 HS코드를 알려주세요"
-            ],
-            "해외 HS분류사례 검색": [
-                "미국에서 전자제품은 어떻게 분류하나요?",
-                "EU의 화학제품 분류 기준은?",
-                "스마트워치의 해외 분류 사례를 알려주세요"
-            ],
-            "HS해설서 분석(품명 + 후보 HS코드)": [
-                "3923.30과 3926.90 중 플라스틱 용기는?",
-                "8471.30과 8471.50 중 노트북은 어디에 해당하나요?",
-                "9113.90과 3926.90 중 스마트워치 밴드는?"
-            ],
-            "HS해설서 원문 검색(HS코드만 입력)": [
-                "3911",
-                "391190",
-                "8471"
-            ],
-            "AI 자동분류": [
-                "플라스틱 용기는 어떻게 분류되나요?",
-                "반도체 시장 동향을 알려주세요",
-                "미국의 전자제품 분류 사례는?"
-            ]
-        }
-
-        # 선택된 카테고리의 예시 질문들
-        examples = example_questions.get(st.session_state.selected_category, [])
-
-        # 예시 질문 버튼 표시 (3개를 가로로 배치)
-        if examples:
-            st.markdown("**💡 예시 질문:**")
-            cols = st.columns(3)
-            for idx, example in enumerate(examples):
-                with cols[idx]:
-                    if st.form_submit_button(f"📌 {example}", use_container_width=True, key=f"example_{idx}"):
-                        st.session_state.selected_example = example
-
         user_input = st.text_input(
             "품목에 대해 질문하세요:",
-            value=st.session_state.get('selected_example', ''),
             placeholder="여기에 입력 후 Enter 또는 전송 버튼 클릭"
         )
-
-        # 예시 선택 후 초기화
-        if 'selected_example' in st.session_state:
-            del st.session_state.selected_example
         
         # 두 개의 컬럼으로 나누어 버튼을 오른쪽에 배치
         col1, col2 = st.columns([4, 1])
@@ -488,7 +481,7 @@ with input_container:
         # 폼이 제출되고 입력값이 있을 때 처리
         if submit_button and user_input and user_input.strip():
             selected_category = st.session_state.selected_category
-            
+
             # HS Manager 인스턴스 가져오기
             hs_manager = get_hs_manager()
             
