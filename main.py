@@ -26,16 +26,8 @@ st.set_page_config(
 # 사용자 정의 CSS 스타일 추가
 st.markdown("""
 <style>
-.main > div {
-    display: flex;
-    flex-direction: column;
-    height: 85vh;  # 메인 컨테이너 높이 설정
-}
-.main > div > div:last-child {
-    margin-top: auto;  # 마지막 요소를 하단에 고정
-}
 .stTextInput input {
-    border-radius: 10px;  # 입력창 모서리 둥글게
+    border-radius: 10px;
     padding: 8px 12px;
     font-size: 16px;
 }
@@ -246,15 +238,9 @@ def process_query_with_real_logging(user_input):
 with st.sidebar:
     st.title("📊 HS 품목분류 전문 AI")
 
+    st.markdown("---")
+
     st.markdown("""
-    ### 🎯 챗봇 소개
-
-    한국 관세청 및 글로벌 HS 분류 데이터를 기반으로
-    **AI 기술**과 **대규모 데이터베이스**를 결합한
-    차세대 품목분류 전문 상담 시스템입니다.
-
-    ---
-
     ### 🚀 핵심 기술
 
     **Multi-Agent 시스템**
@@ -329,52 +315,48 @@ with st.sidebar:
 
 # 메인 페이지 설정
 st.title("HS 품목분류 챗봇")
-st.markdown("""
-<div style='background: #F0F9FF; border-radius: 12px; border-left: 6px solid #3B82F6; padding: 24px 28px 20px 28px; margin-bottom: 18px;'>
-  <h4 style='color:#1E40AF; margin-top:0;'>💡 <b>슬기로운 품목분류 생활 (활용 시나리오) </b></h4>
-  <ol style='padding-left: 18px;'>
-    <li style='margin-bottom: 10px;'>
-      <b>[웹 검색] </span> "스마트워치 실리콘 밴드의 정확한 재질 성분과 제조 공정, 주요 용도는 무엇인가?"</b><br>
-      <span style='color:#059669;'>✓ 답변: 합성고무(실리콘), 스마트워치 전용 부속품 확인</span>
-    </li>
-    <li style='margin-bottom: 10px;'>
-      <b>[국내 사례] </span> "실리콘 재질로 만든 스마트워치용 교체 밴드는 어떤 HS코드로 분류되나요?"</b><br>
-      <span style='color:#059669;'>✓ 답변: 9113.90 (시계 부속품) 12건 / 3926.90 (플라스틱) 5건</span>
-    </li>
-    <li style='margin-bottom: 10px;'>
-      <b>[해외 사례] </span> "미국과 EU에서 스마트워치 실리콘 스트랩(watch strap)의 분류 사례와 관세율을 알려줘"</b><br>
-      <span style='color:#059669;'>✓ 답변: 전 세계 동일: 9113.90 분류</span>
-    </li>
-    <li>
-      <b>[해설서 분석] </span> "스마트워치 전용 실리콘 밴드가 9113.90 시계 부속품과 3926.90 기타 플라스틱 제품 중 어디에 분류되는지 해설서와 통칙을 근거로 비교 분석해줘"</b><br>
-      <span style='color:#059669;'>✓ 결론: 9113.90-0000 (통칙 1, 구체성 원칙)</span>
-    </li>
-  </ol>
-</div>
-""", unsafe_allow_html=True)
 
-# 질문 유형 선택 라디오 버튼 + 설명 카드 (가로 배치)
+# 활용 시나리오를 접을 수 있는 expander로 변경
+with st.expander("💡 슬기로운 품목분류 생활 (활용 시나리오)", expanded=True):
+    st.markdown("""
+    <ol style='padding-left: 18px;'>
+      <li style='margin-bottom: 10px;'>
+        <b>[웹 검색] </span> "스마트워치 실리콘 밴드의 정확한 재질 성분과 제조 공정, 주요 용도는 무엇인가?"</b><br>
+        <span style='color:#059669;'>✓ 답변: 합성고무(실리콘), 스마트워치 전용 부속품 확인</span>
+      </li>
+      <li style='margin-bottom: 10px;'>
+        <b>[국내 사례] </span> "실리콘 재질로 만든 스마트워치용 교체 밴드는 어떤 HS코드로 분류되나요?"</b><br>
+        <span style='color:#059669;'>✓ 답변: 9113.90 (시계 부속품) 12건 / 3926.90 (플라스틱) 5건</span>
+      </li>
+      <li style='margin-bottom: 10px;'>
+        <b>[해외 사례] </span> "미국과 EU에서 스마트워치 실리콘 스트랩(watch strap)의 분류 사례와 관세율을 알려줘"</b><br>
+        <span style='color:#059669;'>✓ 답변: 전 세계 동일: 9113.90 분류</span>
+      </li>
+      <li>
+        <b>[해설서 분석] </span> "스마트워치 전용 실리콘 밴드가 9113.90 시계 부속품과 3926.90 기타 플라스틱 제품 중 어디에 분류되는지 해설서와 통칙을 근거로 비교 분석해줘"</b><br>
+        <span style='color:#059669;'>✓ 결론: 9113.90-0000 (통칙 1, 구체성 원칙)</span>
+      </li>
+    </ol>
+    """, unsafe_allow_html=True)
+
+# 질문 유형 선택 라디오 버튼 (가로 배치)
 st.subheader("질문 유형을 선택하세요")
 
-# 2개 컬럼으로 나누기: 왼쪽 질문 유형 선택, 오른쪽 설명 카드
-col_left, col_right = st.columns([1, 2])
-
-with col_left:
-    selected_category = st.radio(
-        "분석 방식을 선택하세요:",
-        [
-            "웹 검색",
-            "국내 HS분류사례 검색",
-            "해외 HS분류사례 검색",
-            "HS해설서 분석(품명 + 후보 HS코드)",
-            "HS해설서 원문 검색(HS코드만 입력)",
-            "AI 자동분류"
-        ],
-        index=0,
-        horizontal=False,
-        key="category_radio",
-        label_visibility="collapsed"
-    )
+selected_category = st.radio(
+    "분석 방식을 선택하세요:",
+    [
+        "웹 검색",
+        "국내 HS분류사례 검색",
+        "해외 HS분류사례 검색",
+        "HS해설서 분석(품명 + 후보 HS코드)",
+        "HS해설서 원문 검색(HS코드만 입력)",
+        "AI 자동분류"
+    ],
+    index=0,
+    horizontal=True,
+    key="category_radio",
+    label_visibility="collapsed"
+)
 
 # 카테고리명은 그대로 사용
 st.session_state.selected_category = selected_category
@@ -383,60 +365,56 @@ st.session_state.selected_category = selected_category
 category_info = {
     "웹 검색": {
         "icon": "🌐",
-        "description": "**Google Search API**를 활용하여 품목의 일반 정보, 시장 동향, 최신 기술 개발, 산업 현황 등을 실시간으로 검색합니다.",
-        "data_source": "Google Search API (실시간)",
-        "examples": "'반도체 시장 동향', '전기차 배터리 최신 기술', 'AI 칩셋 산업 현황'"
+        "title": "Google Search API",
+        "description": "품목의 일반 정보, 시장 동향, 기술 개발 검색",
+        "examples": "예: 반도체 시장 동향, 전기차 배터리 최신 기술"
     },
     "국내 HS분류사례 검색": {
         "icon": "🇰🇷",
-        "description": "**관세청 분류사례 987건 데이터베이스**를 Multi-Agent 시스템(5그룹 병렬 분석)으로 검색하여 가장 적합한 HS코드를 추천합니다.",
-        "data_source": "관세청 분류사례, HS위원회/협의회 결정",
-        "examples": "'플라스틱 용기 HS코드', '자동차 엔진 부품의 HS코드', '화장품 용기 분류'"
+        "title": "관세청 분류사례 987건",
+        "description": "Multi-Agent 시스템으로 최적 HS코드 추천",
+        "examples": "예: 플라스틱 용기 HS코드, 자동차 부품 분류"
     },
     "해외 HS분류사례 검색": {
         "icon": "🌍",
-        "description": "**미국(CBP) 및 EU 관세청 분류사례 1,900건**을 Multi-Agent 시스템으로 분석하여 글로벌 분류 기준을 비교 제공합니다.",
-        "data_source": "미국/EU 관세청 공식 분류사례",
-        "examples": "'미국 전자제품 분류 기준', 'EU 화학제품 분류사례', '해외 의료기기 분류 동향'"
+        "title": "미국/EU 분류사례 1,900건",
+        "description": "글로벌 분류 기준 비교 분석",
+        "examples": "예: 미국 전자제품 분류, EU 화학제품 사례"
     },
     "HS해설서 분석(품명 + 후보 HS코드)": {
         "icon": "📚",
-        "description": "**사용자가 제시한 여러 HS코드**를 품목분류표 + HS 해설서 + 통칙 기반으로 심층 비교 분석하여 최적 코드를 추천합니다.",
-        "data_source": "HS 품목분류표, HS 해설서 전문, 통칙",
-        "examples": "'3923.30과 3926.90 중 플라스틱 용기는?', '8471.30과 8471.50 중 노트북은?'",
-        "note": "**주의**: 반드시 비교할 HS코드를 질문에 포함해야 합니다."
+        "title": "HS 해설서 + 통칙",
+        "description": "여러 HS코드 심층 비교 분석",
+        "examples": "예: 3923.30과 3926.90 중 플라스틱 용기는?",
+        "note": "주의: 반드시 비교할 HS코드를 질문에 포함해야 합니다."
     },
     "HS해설서 원문 검색(HS코드만 입력)": {
         "icon": "📖",
-        "description": "특정 **HS코드의 해설서 원문**을 통칙/부/류/호 체계로 정리하여 제공합니다.",
-        "data_source": "HS 해설서 전문",
-        "examples": "'3911', '391190', '8471' (HS코드만 입력)"
+        "title": "HS 해설서 원문",
+        "description": "특정 HS코드의 원문을 체계적으로 제공",
+        "examples": "예: 3911, 391190, 8471"
     },
     "AI 자동분류": {
         "icon": "🤖",
-        "description": "**LLM이 질문 내용을 분석**하여 위 5가지 유형 중 가장 적합한 방식을 자동으로 선택해 답변합니다.",
-        "data_source": "상황에 따라 자동 선택",
-        "examples": "'플라스틱 용기 분류', '반도체 동향', '미국 자동차 부품 사례' 등 자유롭게 질문"
+        "title": "자동 질문 분류",
+        "description": "LLM이 최적 분석 방식을 자동 선택",
+        "examples": "예: 플라스틱 용기 분류, 반도체 동향 등 자유롭게 질문"
     }
 }
 
 info = category_info[selected_category]
 
-# 오른쪽 컬럼에 선택된 유형 정보를 카드 형식으로 표시
-with col_right:
-    st.markdown(f"""
-    <div style='background-color: #F0F9FF; padding: 20px; border-radius: 10px; border-left: 5px solid #3B82F6; height: 100%;'>
-        <h3 style='margin-top: 0; color: #1E40AF;'>{info['icon']} {selected_category}</h3>
-        <p style='margin-bottom: 10px;'>{info['description']}</p>
-        <p style='margin-bottom: 10px;'><strong>📊 데이터 출처:</strong> {info['data_source']}</p>
-        <p style='margin-bottom: 5px;'><strong>💡 예시 질문:</strong></p>
-        <p style='margin-bottom: 0; font-style: italic; color: #4B5563;'>{info['examples']}</p>
-    </div>
-    """, unsafe_allow_html=True)
+# 선택된 유형 정보를 라디오 버튼 아래에 카드 형식으로 표시
+st.markdown(f"""
+<div style='background-color: #F0F9FF; padding: 12px 16px; border-radius: 8px; border-left: 4px solid #3B82F6; margin-bottom: 16px;'>
+    <h5 style='margin: 0 0 6px 0; color: #1E40AF;'>{info['icon']} {selected_category} ({info['title']})</h5>
+    <p style='margin: 0; font-size: 14px; font-style: italic; color: #4B5563;'>{info['examples']}</p>
+</div>
+""", unsafe_allow_html=True)
 
-    # 특수 케이스 주의사항 표시
-    if selected_category == "HS해설서 분석(품명 + 후보 HS코드)":
-        st.warning(info.get('note', ''))
+# 특수 케이스 주의사항 표시
+if selected_category == "HS해설서 분석(품명 + 후보 HS코드)":
+    st.warning(info.get('note', ''))
 
 st.divider()  # 구분선 추가
 
