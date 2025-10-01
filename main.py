@@ -39,6 +39,21 @@ st.markdown("""
     padding: 8px 12px;
     font-size: 16px;
 }
+/* 라디오 버튼 크기 및 글자 크기 증가 */
+.stRadio > label {
+    font-size: 16px !important;
+    font-weight: 500 !important;
+}
+.stRadio > div {
+    gap: 4px !important;
+}
+.stRadio > div > label {
+    font-size: 17px !important;
+    padding: 4px 0px !important;
+}
+.stRadio > div > label > div:first-child {
+    margin-right: 8px !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -52,7 +67,7 @@ if 'chat_history' not in st.session_state:
     st.session_state.chat_history = []  # 채팅 기록 저장
 
 if 'selected_category' not in st.session_state:
-    st.session_state.selected_category = "AI자동분류"  # 기본값
+    st.session_state.selected_category = "AI 자동분류"  # 기본값
 
 if 'context' not in st.session_state:
     # 초기 컨텍스트 설정
@@ -132,7 +147,7 @@ def process_query_with_real_logging(user_input):
         category = st.session_state.selected_category
         logger.log_actual("INFO", "Category selected", category)
         
-        if category == "AI자동분류":
+        if category == "AI 자동분류":
             logger.log_actual("AI", "Starting LLM question classification...")
             start_classify = time.time()
             q_type = classify_question(user_input)
@@ -140,14 +155,24 @@ def process_query_with_real_logging(user_input):
             logger.log_actual("SUCCESS", "LLM classification completed", f"{q_type} in {classify_time:.2f}s")
         else:
             category_mapping = {
-                "웹검색": "web_search",
-                "국내HS분류사례 검색": "hs_classification", 
-                "해외HS분류사례검색": "overseas_hs",
-                "HS해설서분석": "hs_manual",
-                "HS해설서원문검색": "hs_manual_raw"
+                "웹 검색": "web_search",
+                "국내 HS분류사례 검색": "hs_classification",
+                "해외 HS분류사례 검색": "overseas_hs",
+                "HS해설서 분석(품명 + 후보 HS코드)": "hs_manual",
+                "HS해설서 원문 검색(HS코드만 입력)": "hs_manual_raw",
+                "AI 자동분류": "auto"  # AI 자동분류는 자동 판별로 처리
             }
             q_type = category_mapping.get(category, "hs_classification")
-            logger.log_actual("INFO", "Question type mapped", q_type)
+
+            # AI 자동분류가 수동 선택된 경우 자동 판별 실행
+            if q_type == "auto":
+                logger.log_actual("AI", "Starting LLM question classification (manual selection)...")
+                start_classify = time.time()
+                q_type = classify_question(user_input)
+                classify_time = time.time() - start_classify
+                logger.log_actual("SUCCESS", "LLM classification completed", f"{q_type} in {classify_time:.2f}s")
+            else:
+                logger.log_actual("INFO", "Question type mapped", q_type)
 
         answer_start = time.time()
         
@@ -217,47 +242,59 @@ def process_query_with_real_logging(user_input):
         raise e
 
 
-# 사이드바 설정 (main.py의 with st.sidebar: 부분 교체)
+# 사이드바 설정 - 챗봇 특성 소개
 with st.sidebar:
-    st.title("🚀 HS Chatbot")
+    st.title("📊 HS 품목분류 전문 AI")
+
     st.markdown("""
-    ### 📊 HS 품목분류 전문 AI
+    ### 🎯 챗봇 소개
 
-    **🤖 AI 자동분류**
-    - LLM 기반 질문 유형 자동 판별
-    - 최적 검색 방식 자동 선택
-
-    **🌐 웹 검색**
-    - Google Search API 실시간 정보
-    - 물품개요, 시장동향, 뉴스, 산업현황
-
-    **🇰🇷 국내 HS 분류검색**
-    - 관세청 사례 1,000+ 데이터베이스
-    - Multi-Agent 5그룹 병렬 분석
-    - Head Agent 최종 취합
-
-    **🌍 해외 HS 분류검색**
-    - 미국/EU 관세청 데이터
-    - 국제 분류 동향 비교 분석
-
-    **📚 HS 해설서 분석** ⭐
-    - **사용자가 반드시 HS 코드를 제시해야 함**
-    - 각 HS코드별 품목분류표 + 해설서 분석
-    - 통칙 기반 체계적 비교
-    - Gemini AI 최적 코드 추천
-    - 실시간 프로세스 표시
-    - 예: "3923.30과 3926.90 중 어느 것이 맞나요?"
-
-    **📖 HS 해설서 원문**
-    - 특정 HS코드 해설서 조회
-    - 통칙/부/류/호 체계적 정리
+    한국 관세청 및 글로벌 HS 분류 데이터를 기반으로
+    **AI 기술**과 **대규모 데이터베이스**를 결합한
+    차세대 품목분류 전문 상담 시스템입니다.
 
     ---
 
-    **💡 핵심 특징**
-    - Multi-Agent 병렬 처리
-    - 실시간 로깅으로 투명성 보장
-    - 듀얼 패스 검색으로 정확도 향상
+    ### 🚀 핵심 기술
+
+    **Multi-Agent 시스템**
+    - 5개 그룹 병렬 분석 (최대 3개 동시 실행)
+    - Head Agent 최종 종합
+    
+    **Gemini AI 2.5 Flash**
+    - Google 최신 LLM 모델
+    
+    ---
+
+    ### 📚 보유 데이터
+
+    **국내 분류사례**
+    - 관세청 분류사례: 899건 (10개 파일로 분할)
+    - HS 위원회 결정: 76건
+    - HS 협의회 결정: 12건
+    - **총 987건**
+
+    **해외 분류사례**
+    - 미국 CBP 분류사례: 900건
+    - EU 관세청 분류사례: 1,000건
+    - **총 1,900건**
+
+    **공식 해설서**
+    - HS 품목분류표: 17,966개 코드
+    - HS 해설서: 1,448개 항목
+    - HS 통칙: 9개 조항
+
+    **실시간 웹 데이터**
+    - Google Search API 연동
+
+    ---
+
+    ### ⚡ 성능 특징
+
+    - 캐싱으로 데이터 로딩 최적화
+    - 실시간 처리 과정 투명 공개
+    - AI 분석 결과 세션 저장
+    - 대화 컨텍스트 누적 관리
     """)
 
     st.divider()
@@ -292,47 +329,114 @@ with st.sidebar:
 
 # 메인 페이지 설정
 st.title("HS 품목분류 챗봇")
-st.write("HS 품목분류에 대해 질문해주세요!")
+st.markdown("""
+<div style='background: #F0F9FF; border-radius: 12px; border-left: 6px solid #3B82F6; padding: 24px 28px 20px 28px; margin-bottom: 18px;'>
+  <h4 style='color:#1E40AF; margin-top:0;'>💡 <b>슬기로운 품목분류 생활 (활용 시나리오) </b></h4>
+  <ol style='padding-left: 18px;'>
+    <li style='margin-bottom: 10px;'>
+      <b>[웹 검색] </span> "스마트워치 실리콘 밴드의 정확한 재질 성분과 제조 공정, 주요 용도는 무엇인가?"</b><br>
+      <span style='color:#059669;'>✓ 답변: 합성고무(실리콘), 스마트워치 전용 부속품 확인</span>
+    </li>
+    <li style='margin-bottom: 10px;'>
+      <b>[국내 사례] </span> "실리콘 재질로 만든 스마트워치용 교체 밴드는 어떤 HS코드로 분류되나요?"</b><br>
+      <span style='color:#059669;'>✓ 답변: 9113.90 (시계 부속품) 12건 / 3926.90 (플라스틱) 5건</span>
+    </li>
+    <li style='margin-bottom: 10px;'>
+      <b>[해외 사례] </span> "미국과 EU에서 스마트워치 실리콘 스트랩(watch strap)의 분류 사례와 관세율을 알려줘"</b><br>
+      <span style='color:#059669;'>✓ 답변: 전 세계 동일: 9113.90 분류</span>
+    </li>
+    <li>
+      <b>[해설서 분석] </span> "스마트워치 전용 실리콘 밴드가 9113.90 시계 부속품과 3926.90 기타 플라스틱 제품 중 어디에 분류되는지 해설서와 통칙을 근거로 비교 분석해줘"</b><br>
+      <span style='color:#059669;'>✓ 결론: 9113.90-0000 (통칙 1, 구체성 원칙)</span>
+    </li>
+  </ol>
+</div>
+""", unsafe_allow_html=True)
 
-# 질문 유형 선택 라디오 버튼
-selected_category = st.radio(
-    "질문 유형을 선택하세요:",
-    [
-        "AI자동분류 (AI가 질문 유형을 자동 판별)",
-        "웹검색 (물품개요, 시장동향, 뉴스, 산업현황 검색)", 
-        "국내HS분류사례 검색 (관세청 분류사례 기반 HS코드 추천)",
-        "해외HS분류사례검색 (미국/EU 분류사례 비교분석)",
-        "HS해설서분석 (사용자가 제시한 HS코드들을 비교분석하여 최적 코드 추천)",
-        "HS해설서원문검색 (특정 HS코드의 해설서 원문 조회)"
-    ],
-    index=0,  # 기본값: AI자동분류
-    horizontal=False,  # 세로 배열로 변경 (설명이 길어져서)
-    key="category_radio"
-)
+# 질문 유형 선택 라디오 버튼 + 설명 카드 (가로 배치)
+st.subheader("질문 유형을 선택하세요")
 
-# 선택된 카테고리에서 실제 카테고리명 추출
-category_mapping = {
-    "AI자동분류 (AI가 질문 유형을 자동 판별)": "AI자동분류",
-    "웹검색 (물품개요, 시장동향, 뉴스, 산업현황 검색)": "웹검색",
-    "국내HS분류사례 검색 (관세청 분류사례 기반 HS코드 추천)": "국내HS분류사례 검색",
-    "해외HS분류사례검색 (미국/EU 분류사례 비교분석)": "해외HS분류사례검색",
-    "HS해설서분석 (사용자가 제시한 HS코드들을 비교분석하여 최적 코드 추천)": "HS해설서분석",
-    "HS해설서원문검색 (특정 HS코드의 해설서 원문 조회)": "HS해설서원문검색"
+# 2개 컬럼으로 나누기: 왼쪽 질문 유형 선택, 오른쪽 설명 카드
+col_left, col_right = st.columns([1, 2])
+
+with col_left:
+    selected_category = st.radio(
+        "분석 방식을 선택하세요:",
+        [
+            "웹 검색",
+            "국내 HS분류사례 검색",
+            "해외 HS분류사례 검색",
+            "HS해설서 분석(품명 + 후보 HS코드)",
+            "HS해설서 원문 검색(HS코드만 입력)",
+            "AI 자동분류"
+        ],
+        index=0,
+        horizontal=False,
+        key="category_radio",
+        label_visibility="collapsed"
+    )
+
+# 카테고리명은 그대로 사용
+st.session_state.selected_category = selected_category
+
+# 선택된 유형에 따른 상세 설명 및 예시 표시
+category_info = {
+    "웹 검색": {
+        "icon": "🌐",
+        "description": "**Google Search API**를 활용하여 품목의 일반 정보, 시장 동향, 최신 기술 개발, 산업 현황 등을 실시간으로 검색합니다.",
+        "data_source": "Google Search API (실시간)",
+        "examples": "'반도체 시장 동향', '전기차 배터리 최신 기술', 'AI 칩셋 산업 현황'"
+    },
+    "국내 HS분류사례 검색": {
+        "icon": "🇰🇷",
+        "description": "**관세청 분류사례 987건 데이터베이스**를 Multi-Agent 시스템(5그룹 병렬 분석)으로 검색하여 가장 적합한 HS코드를 추천합니다.",
+        "data_source": "관세청 분류사례, HS위원회/협의회 결정",
+        "examples": "'플라스틱 용기 HS코드', '자동차 엔진 부품의 HS코드', '화장품 용기 분류'"
+    },
+    "해외 HS분류사례 검색": {
+        "icon": "🌍",
+        "description": "**미국(CBP) 및 EU 관세청 분류사례 1,900건**을 Multi-Agent 시스템으로 분석하여 글로벌 분류 기준을 비교 제공합니다.",
+        "data_source": "미국/EU 관세청 공식 분류사례",
+        "examples": "'미국 전자제품 분류 기준', 'EU 화학제품 분류사례', '해외 의료기기 분류 동향'"
+    },
+    "HS해설서 분석(품명 + 후보 HS코드)": {
+        "icon": "📚",
+        "description": "**사용자가 제시한 여러 HS코드**를 품목분류표 + HS 해설서 + 통칙 기반으로 심층 비교 분석하여 최적 코드를 추천합니다.",
+        "data_source": "HS 품목분류표, HS 해설서 전문, 통칙",
+        "examples": "'3923.30과 3926.90 중 플라스틱 용기는?', '8471.30과 8471.50 중 노트북은?'",
+        "note": "**주의**: 반드시 비교할 HS코드를 질문에 포함해야 합니다."
+    },
+    "HS해설서 원문 검색(HS코드만 입력)": {
+        "icon": "📖",
+        "description": "특정 **HS코드의 해설서 원문**을 통칙/부/류/호 체계로 정리하여 제공합니다.",
+        "data_source": "HS 해설서 전문",
+        "examples": "'3911', '391190', '8471' (HS코드만 입력)"
+    },
+    "AI 자동분류": {
+        "icon": "🤖",
+        "description": "**LLM이 질문 내용을 분석**하여 위 5가지 유형 중 가장 적합한 방식을 자동으로 선택해 답변합니다.",
+        "data_source": "상황에 따라 자동 선택",
+        "examples": "'플라스틱 용기 분류', '반도체 동향', '미국 자동차 부품 사례' 등 자유롭게 질문"
+    }
 }
-actual_category = category_mapping[selected_category]
-st.session_state.selected_category = actual_category
 
-# 선택된 유형에 따른 예시 질문 표시
-example_messages = {
-    "AI자동분류": "💡 **예시**: '플라스틱 용기 분류', '반도체 시장 동향', '미국 자동차 부품 분류사례' 등 자유롭게 질문하세요",
-    "웹검색": "💡 **예시**: '반도체 시장 동향', '전기차 배터리 최신 기술', 'AI 칩셋 산업 현황'",
-    "국내HS분류사례 검색": "💡 **예시**: '플라스틱 용기는 어떤 HS코드로 분류되나요?', '자동차 엔진 부품의 HS코드', '화장품 용기 분류'",
-    "해외HS분류사례검색": "💡 **예시**: '미국에서 전자제품 분류 기준', 'EU 화학제품 분류사례', '해외 의료기기 분류 동향'",
-    "HS해설서분석": "💡 **예시**: '3923.30과 3926.90 중에서 플라스틱 용기 분류는 무엇인가요?', '8471.30, 8471.50 중 노트북은 어디에 분류되나요?'",
-    "HS해설서원문검색": "💡 **예시**: '3911', '391190', '8471' (HS코드만 입력하세요)"
-}
+info = category_info[selected_category]
 
-st.info(example_messages[actual_category])
+# 오른쪽 컬럼에 선택된 유형 정보를 카드 형식으로 표시
+with col_right:
+    st.markdown(f"""
+    <div style='background-color: #F0F9FF; padding: 20px; border-radius: 10px; border-left: 5px solid #3B82F6; height: 100%;'>
+        <h3 style='margin-top: 0; color: #1E40AF;'>{info['icon']} {selected_category}</h3>
+        <p style='margin-bottom: 10px;'>{info['description']}</p>
+        <p style='margin-bottom: 10px;'><strong>📊 데이터 출처:</strong> {info['data_source']}</p>
+        <p style='margin-bottom: 5px;'><strong>💡 예시 질문:</strong></p>
+        <p style='margin-bottom: 0; font-style: italic; color: #4B5563;'>{info['examples']}</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # 특수 케이스 주의사항 표시
+    if selected_category == "HS해설서 분석(품명 + 후보 HS코드)":
+        st.warning(info.get('note', ''))
 
 st.divider()  # 구분선 추가
 
@@ -395,12 +499,12 @@ with input_container:
     with st.form("query_form", clear_on_submit=True):
         # 선택된 유형에 따른 placeholder 메시지
         placeholders = {
-            "AI자동분류": "예: '플라스틱 용기 분류', '반도체 동향' 등 자유롭게 질문하세요",
-            "웹검색": "예: '반도체 시장 동향', '전기차 산업 현황'",
-            "국내HS분류사례 검색": "예: '플라스틱 용기 HS코드', '자동차 부품 분류'",
-            "해외HS분류사례검색": "예: '미국 전자제품 분류', 'EU 화학제품 사례'",
-            "HS해설서분석": "예: '3923.30과 3926.90 중 플라스틱 용기 분류는?', '8471.30과 8471.50 중 노트북은?'",
-            "HS해설서원문검색": "예: '3911' 또는 '391190' (HS코드만 입력)"
+            "웹 검색": "예: '반도체 시장 동향', '전기차 산업 현황'",
+            "국내 HS분류사례 검색": "예: '플라스틱 용기 HS코드', '자동차 부품 분류'",
+            "해외 HS분류사례 검색": "예: '미국 전자제품 분류', 'EU 화학제품 사례'",
+            "HS해설서 분석(품명 + 후보 HS코드)": "예: '3923.30과 3926.90 중 플라스틱 용기 분류는?'",
+            "HS해설서 원문 검색(HS코드만 입력)": "예: '3911' 또는 '391190' (HS코드만 입력)",
+            "AI 자동분류": "예: '플라스틱 용기 분류', '반도체 동향' 등 자유롭게 질문하세요"
         }
         
         user_input = st.text_input(
@@ -421,14 +525,14 @@ with input_container:
             hs_manager = get_hs_manager()
             
             # 분석 과정 표시가 필요한 유형들
-            if selected_category in ["국내HS분류사례 검색", "해외HS분류사례검색", "HS해설서분석"]:
-                if selected_category in ["국내HS분류사례 검색", "해외HS분류사례검색"]:
+            if selected_category in ["국내 HS분류사례 검색", "해외 HS분류사례 검색", "HS해설서 분석(품명 + 후보 HS코드)"]:
+                if selected_category in ["국내 HS분류사례 검색", "해외 HS분류사례 검색"]:
                     st.session_state.ai_analysis_results = []  # Multi-Agent용 결과 초기화
                 analysis_expander = st.expander("🔍 **AI 분석 과정 보기**", expanded=True)
-            
+
             try:
                 # 분석 과정 표시 방식 분기
-                if selected_category == "HS해설서분석":
+                if selected_category == "HS해설서 분석(품명 + 후보 HS코드)":
                     # HS 해설서 분석은 HS코드 유무에 따라 분기
                     class DummyLogger:
                         def log_actual(self, level, message, data=None):
@@ -444,27 +548,27 @@ with input_container:
                     else:
                         # HS코드가 없으면 에러 메시지
                         answer = "해설서 분석 모드에서는 반드시 HS 코드를 제시해야 합니다.\n\n예시: '3923.30과 3926.90 중 어느 것이 맞나요?'"
-                elif selected_category not in ["국내HS분류사례 검색", "해외HS분류사례검색"]:
+                elif selected_category not in ["국내 HS분류사례 검색", "해외 HS분류사례 검색"]:
                     # 기타 유형은 로그 패널 표시
                     with st.expander("실시간 처리 과정 로그 보기", expanded=True):
                         answer = process_query_with_real_logging(user_input)
                 else:
                     # Multi-Agent 분석용 특별 처리
-                    if selected_category == "국내HS분류사례 검색":
+                    if selected_category == "국내 HS분류사례 검색":
                         # utils 함수를 직접 호출하되 expander 컨테이너 전달
                         final_answer = handle_hs_classification_cases(user_input, st.session_state.context, hs_manager, analysis_expander)
                         answer = "\n\n +++ HS 분류사례 검색 실시 +++\n\n" + final_answer
-                    elif selected_category == "해외HS분류사례검색":
+                    elif selected_category == "해외 HS분류사례 검색":
                         final_answer = handle_overseas_hs(user_input, st.session_state.context, hs_manager, analysis_expander)
                         answer = "\n\n +++ 해외 HS 분류 검색 실시 +++\n\n" + final_answer
-                
+
                 # Update chat history after successful processing
                 st.session_state.chat_history.append({"role": "user", "content": user_input})
                 st.session_state.chat_history.append({"role": "assistant", "content": answer})
                 st.session_state.context += f"\n사용자: {user_input}\n품목분류 전문가: {answer}\n"
-                
+
                 # 분석 과정이 표시된 유형들의 최종 답변 표시 (마크다운으로 렌더링)
-                if selected_category in ["국내HS분류사례 검색", "해외HS분류사례검색", "HS해설서분석"]:
+                if selected_category in ["국내 HS분류사례 검색", "해외 HS분류사례 검색", "HS해설서 분석(품명 + 후보 HS코드)"]:
                     st.markdown("**품목분류 전문가:**")
                     st.markdown(answer)
                 
