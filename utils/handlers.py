@@ -471,7 +471,7 @@ def handle_hs_manual_with_parallel_search(user_input, context, hs_manager, logge
 
     for i, result in enumerate(search_results):
         if result['manual_content']:
-            summary_prompt = f"""다음 HS 해설서 내용을 1000자 이내로 핵심 내용만 요약해주세요:
+            summary_prompt = f"""다음 HS 해설서 내용을 700자 이내로 핵심 내용만 요약해주세요:
 
 HS코드: {result['hs_code']}
 해설서 원문:
@@ -495,10 +495,10 @@ HS코드: {result['hs_code']}
             except APIError as e:
                 error_msg = f"Gemini API 오류 (코드: {e.code}): {e.message}"
                 logger.log_actual("ERROR", f"HS코드 {result['hs_code']} 요약 실패", error_msg)
-                result['manual_summary'] = result['manual_content'][:1000] + "..." if len(result['manual_content']) > 1000 else result['manual_content']
+                result['manual_summary'] = result['manual_content'][:700] + "..." if len(result['manual_content']) > 700 else result['manual_content']
             except Exception as e:
                 logger.log_actual("ERROR", f"HS코드 {result['hs_code']} 요약 실패: {str(e)}")
-                result['manual_summary'] = result['manual_content'][:1000] + "..." if len(result['manual_content']) > 1000 else result['manual_content']
+                result['manual_summary'] = result['manual_content'][:700] + "..." if len(result['manual_content']) > 700 else result['manual_content']
         else:
             result['manual_summary'] = ""
 
