@@ -1,176 +1,303 @@
-# HS 품목분류 챗봇 🚀
+# HS 품목분류 챗봇
 
-HS 품목분류 전문가 AI 챗봇입니다. 관세청 품목분류 사례, 해외 HS 분류 사례, HS 해설서 등 다양한 데이터를 Multi Agents 시스템으로 분석하여 전문적인 HS 코드 분류 답변을 제공합니다.
+관세청 품목분류 사례, 해외 HS 분류 사례, HS 해설서 등 다양한 데이터를 Multi-Agent 시스템으로 분석하여 전문적인 HS 코드 분류 답변을 제공하는 AI 챗봇입니다.
 
-## 📋 목차
-- [핵심 기능](#핵심-기능)
-- [설치 및 실행](#설치-및-실행)
-- [기능별 사용법](#기능별-사용법)
-- [프로젝트 구조](#프로젝트-구조)
-- [환경 설정](#환경-설정)
+---
 
-## 🎯 핵심 기능
+## 슬기로운 품목분류 생활
 
-### 1. AI 자동분류 🤖
+### 시나리오: BT21 LED 무드등 수입 업무
+
+당신은 캐릭터 굿즈를 수입하는 온라인 쇼핑몰 MD입니다.
+LED 조명이 내장된 피규어 하우스 무드등을 수입하려는데, 정확한 HS 코드를 찾아야 합니다.
+
+**제품 상세:**
+- LED 광원 충전식 무드등
+- 본체, 피규어, USB 케이블 포함
+- 크기: 114×59×149mm
+- 배터리: 900mAh 내장
+- 작동 방식: 마그네틱으로 피규어를 넣으면 LED 점등
+
+---
+
+### 1단계: 웹 검색
+
+**질문:** "LED 무드등의 기술 사양과 시장 동향, 주요 용도는?"
+
+**답변:** LED 조명 기술 발전 현황, 인테리어 소품 시장 규모, 수면등/분위기 조명 용도 확인
+
+---
+
+### 2단계: 국내 HS 분류사례 검색
+
+**질문:** "LED 충전식 무드등은 어떤 HS코드로 분류되나요?"
+
+**답변:** 9405.21-0000 (전기식 탁상용/침대용 램프) **14건 확인**
+
+- 관세청 분류사례를 5개 그룹으로 분할하여 Multi-Agent 병렬 분석
+- Head Agent가 모든 그룹 결과를 종합하여 최종 답변 생성
+
+---
+
+### 3단계: 해외 HS 분류사례 검색
+
+**질문:** "미국과 EU에서 LED lamp, mood light 분류 사례는?"
+
+**답변:**
+- 미국 CBP: **27건** - 주로 9405 류 분류
+- EU BTI: **292건** - 9405 류 또는 9503(장난감) 분류 사례 분석
+- 국제적 분류 동향 파악
+
+---
+
+### 4단계: HS 해설서 분석
+
+**질문:** "캐릭터 피규어가 포함된 LED 무드등이 9405.21(전기식 램프)과 9503(장난감) 중 어디에 분류되는지 해설서와 통칙을 근거로 비교 분석해줘"
+
+**답변:**
+- 9405.21-0000 **최종 선정**
+- 근거: 통칙 3(본질적 특성은 조명 기능)
+- HS 해설서 제94류 및 제95류 비교 분석
+- 관세율표 정보 및 통칙 종합 검토
+
+---
+
+**이 모든 과정이 단 5분 안에, 노트북 하나로 가능합니다.**
+
+---
+
+## 왜 이 챗봇인가?
+
+### 가볍고 빠릅니다
+- **노트북 또는 Streamlit Cloud 무료 계정**에서 즉시 실행
+- 별도 서버 불필요, 클라우드 비용 제로
+- 초기 로딩 후 **실시간 응답 (5-10초 내)**
+
+### 비용이 들지 않습니다
+- **Google Gemini 2.5 Flash 무료 API** 사용
+- 높은 일일 무료 할당량 (1,500 requests/day)
+- 추가 인프라 비용 없음
+
+### Multi-Agent로 정확하고 빠릅니다
+- **5개 그룹 병렬 분석** (최대 3개 동시 실행)
+- 987건 국내 사례를 **5초 내 분석**
+- **Head Agent**가 모든 결과를 종합 판단
+
+### 신뢰할 수 있는 공식 데이터 소스
+
+**국내 분류사례 (총 987건)**
+- 관세청 분류사례: 899건
+- HS위원회 결정: 76건
+- HS협의회 결정: 12건
+
+**해외 분류사례 (총 1,900건)**
+- 미국 CBP 분류사례: 900건
+- EU 관세청 BTI: 1,000건
+
+**공식 해설서**
+- HS 품목분류표: 17,966개 코드
+- HS 해설서: 1,448개 항목
+- HS 통칙: 9개 조항
+
+**실시간 웹 데이터**
+- Google Search API 연동
+
+---
+
+## 빠른 시작
+
+### 1. 저장소 클론 및 패키지 설치
+
+```bash
+git clone <repository_url>
+cd kcs_hs_chatbot
+pip install -r requirements.txt
+```
+
+**필수 패키지:**
+- `google-genai` - Gemini API 클라이언트
+- `streamlit` - 웹 UI 프레임워크
+- `python-dotenv` - 환경 변수 관리
+- `numpy`, `pandas`, `requests` - 데이터 처리
+
+---
+
+### 2. API 키 설정
+
+```bash
+# .env 파일 생성
+echo "GOOGLE_API_KEY=your_api_key_here" > .env
+```
+
+Google API 키는 [Google AI Studio](https://aistudio.google.com/app/apikey)에서 **무료로 발급**받을 수 있습니다.
+
+---
+
+### 3. 데이터 준비
+
+`knowledge/` 폴더에 다음 JSON 파일들을 배치하세요:
+
+**국내 분류사례 (10개 파일)**
+- `HS분류사례_part1.json` ~ `HS분류사례_part10.json`
+
+**위원회 결정 (2개 파일)**
+- `HS위원회.json`
+- `HS협의회.json`
+
+**해외 분류사례 (2개 파일)**
+- `hs_classification_data_us.json` (미국 CBP)
+- `hs_classification_data_eu.json` (EU BTI)
+
+**공식 자료 (3개 파일)**
+- `hstable.json` (관세율표)
+- `grouped_11_end.json` (HS 해설서)
+- `통칙_grouped.json` (HS 통칙)
+
+---
+
+### 4. 실행
+
+```bash
+streamlit run main.py
+```
+
+브라우저에서 자동으로 `http://localhost:8501` 열림
+
+---
+
+## 핵심 기능
+
+### 1. AI 자동분류
 - 사용자 질문을 LLM이 자동으로 분석하여 가장 적합한 방식으로 답변
 - 5가지 질문 유형 중 최적의 방법을 자동 선택
 
-### 2. 웹 검색 🌐
+### 2. 웹 검색
 - 물품개요, 용도, 뉴스, 무역동향, 산업동향 등 최신 정보 제공
 - Google Search API를 통한 실시간 정보 검색
 
-### 3. 국내 HS 분류사례 검색 🇰🇷
-- 관세청 품목분류 사례 약 1,000개 데이터베이스 분석
-- Multi Agents 시스템: 데이터를 5개 그룹으로 분할하여 각 그룹별로 유사한 3개 사례 검색
+### 3. 국내 HS 분류사례 검색
+- 관세청 품목분류 사례 987건 데이터베이스 분석
+- Multi-Agent 시스템: 데이터를 5개 그룹으로 분할하여 병렬 검색
 - Head Agent가 최종 취합하여 전문적인 HS 코드 분류 답변 제공
 
-### 4. 해외 HS 분류사례 검색 🌍
-- 미국 및 EU 관세청 품목분류 사례 분석
-- Multi Agents 시스템: 해외 데이터를 5개 그룹으로 분할 분석
+### 4. 해외 HS 분류사례 검색
+- 미국 CBP 및 EU BTI 품목분류 사례 1,900건 분석
+- Multi-Agent 시스템: 해외 데이터를 5개 그룹으로 분할 분석
 - 국제적인 HS 분류 동향 및 비교 분석 제공
 
-### 5. HS 해설서 분석 (사용자 제시 코드) 📚
+### 5. HS 해설서 분석 (사용자 제시 코드)
 - 사용자가 직접 제시한 HS 코드들을 전문적으로 비교 분석
 - 5단계 체계적 분석: 코드 추출 → 관세율표 정보 → 해설서 수집 → 통칙 준비 → AI 비교 분석
 - 투명한 분석 과정: 각 단계별 진행 상황을 실시간으로 공개
 - 여러 HS 코드의 장단점, 적용 가능성, 리스크 등을 종합 평가
 
-### 6. HS 해설서 원문 검색 📖
+### 6. HS 해설서 원문 검색
 - 특정 HS 코드의 해설서 원문을 구조화된 형태로 제공
 - 통칙, 부/류/호 해설을 체계적으로 정리하여 표시
 
-## 🚀 설치 및 실행
+---
 
-### 필수 요구사항
-```bash
-pip install -r requirements.txt
-```
+## 기술 아키텍처
 
-### 환경 설정
-1. `.env` 파일 생성:
-```env
-GOOGLE_API_KEY=your_google_api_key_here
-```
+### Multi-Agent 시스템
 
-2. 필요한 데이터 파일들을 `knowledge/` 폴더에 배치:
-   - `HS분류사례_part1.json` ~ `HS분류사례_part10.json` (국내 분류사례)
-   - `HS위원회.json`, `HS협의회.json` (위원회/협의회 결정)
-   - `hs_classification_data_us.json` (미국 관세청 데이터)
-   - `hs_classification_data_eu.json` (EU 관세청 데이터)
-   - `hstable.json` (관세율표 - 병렬검색용)
-   - `통칙_grouped.json` (HS 통칙)
-   - `grouped_11_end.json` (HS 해설서)
+**5개 Group Agent**
+- 대용량 데이터(987건 국내 + 1,900건 해외)를 5개 그룹으로 분할
+- 각 그룹별로 독립적인 Gemini 인스턴스 실행
+- ThreadPoolExecutor로 최대 3개 동시 병렬 처리
 
-### 실행
-```bash
-streamlit run main.py
-```
+**Head Agent**
+- 5개 Group Agent의 모든 분석 결과를 수집
+- 빈도수, 유사도, 신뢰도를 종합하여 최종 답변 생성
+- Gemini 2.5 Flash 모델로 고품질 종합 분석
 
-## 📖 기능별 사용법
+### Gemini 모델 전략
 
-### 1. AI 자동분류 사용법
-**사용 시점**: 어떤 유형의 질문인지 확실하지 않을 때
+**gemini-2.0-flash**
+- 질문 유형 자동 분류 (question_classifier.py)
+- 그룹별 사례 검색 및 요약
+- 빠른 응답이 필요한 작업
 
-**예시 질문**:
-```
-"리튬이온 배터리의 HS 코드가 무엇인가요?"
-"전기차 시장 동향이 궁금합니다"
-```
+**gemini-2.5-flash**
+- Head Agent 최종 종합 분석
+- HS 해설서 비교 분석
+- 복잡한 추론이 필요한 작업
 
-### 2. 웹 검색 사용법
-**사용 시점**: 최신 물품 정보, 뉴스, 동향이 필요할 때
+### 실시간 투명성
 
-**예시 질문**:
-```
-"전기차 배터리 기술 발전 현황"
-```
+**RealTimeProcessLogger**
+- 모든 처리 단계를 밀리초 단위로 추적
+- 8개 최근 로그를 UI에 실시간 표시
+- 로그 레벨: INFO, SUCCESS, ERROR, DATA, AI, SEARCH
 
-### 3. 국내 HS 분류사례 검색 사용법
-**사용 시점**: 한국 관세청의 공식 분류 사례가 필요할 때
+**UI 컨테이너 분리**
+- Multi-Agent 분석 과정을 Expander로 실시간 표시
+- 각 그룹별 분석 시작 시간, 처리 시간, 결과 공개
+- 사용자가 AI 사고 과정을 투명하게 확인 가능
 
-**예시 질문**:
-```
-"프로틴 파우더의 HS 코드는?"
-"무선 이어폰 HS 분류"
-```
+### 모듈화 구조
 
-### 4. 해외 HS 분류사례 검색 사용법
-**사용 시점**: 미국/EU 관세청 분류 사례나 국제적 동향이 필요할 때
+`utils/` 패키지는 기능별로 분리된 7개 모듈로 구성:
 
-**예시 질문**:
-```
-"미국에서 전자담배 HS 분류는?"
-"EU의 친환경 포장재 HS 코드"
-```
+- `data_loader.py` - HSDataManager 클래스 (데이터 로딩 및 관리)
+- `handlers.py` - 질문 유형별 처리 함수 (Multi-Agent 로직 포함)
+- `question_classifier.py` - LLM 기반 질문 자동 분류
+- `hs_manual_utils.py` - HS 해설서 관련 함수들
+- `search_engines.py` - 병렬 검색 엔진 (관세율표 + 해설서)
+- `text_utils.py` - 텍스트 처리 유틸리티 (clean_text, extract_hs_codes)
+- `__init__.py` - 모듈 통합 및 backward compatibility
 
-### 5. HS 해설서 분석 사용법 (사용자 제시 코드)
-**사용 시점**: 여러 HS 코드 중에서 최적의 코드를 선택하고 싶을 때
+---
 
-**분석 프로세스**:
-1. 코드 추출: 사용자 입력에서 HS 코드 자동 인식
-2. 관세율표 정보: 각 코드의 공식 품목명과 세율 정보 수집
-3. 해설서 수집: 관련 통칙, 부/류/호 해설 자동 수집
-4. 통칙 준비: HS 분류 기본 원칙 준비
-5. AI 전문 분석: 종합적 비교 분석 및 최종 추천
-
-**예시 질문**:
-```
-"스마트워치가 8517.62(스마트폰)와 9102.11(손목시계) 중 어디에 해당하나요?"
-"전기차 충전기가 8504.40과 8544.42 중 어떤 코드인가요?"
-```
-
-### 6. HS 해설서 원문 검색 사용법
-**사용 시점**: 특정 HS 코드의 공식 해설서 원문이 필요할 때
-
-**예시 질문**:
-```
-"8517"
-"HS 2106"
-```
-
-
-## 🏗️ 프로젝트 구조
+## 프로젝트 구조
 
 ```
-HS_Chatbot/
-├── main.py                 # Streamlit 메인 애플리케이션 (실시간 로깅 포함)
-├── utils.py                # 핵심 기능 및 병렬 검색 시스템
+kcs_hs_chatbot/
+├── main.py                 # Streamlit 메인 애플리케이션
+├── utils/                  # 유틸리티 모듈 패키지
+│   ├── __init__.py         # 모듈 통합 및 export
+│   ├── data_loader.py      # HSDataManager 클래스
+│   ├── handlers.py         # 질문 유형별 처리 함수 (Multi-Agent)
+│   ├── question_classifier.py  # LLM 기반 질문 자동 분류
+│   ├── hs_manual_utils.py  # HS 해설서 관련 함수들
+│   ├── search_engines.py   # 병렬 검색 엔진 (관세율표 + 해설서)
+│   └── text_utils.py       # 텍스트 처리 유틸리티
 ├── hs_search.py            # HS 코드 검색 유틸리티
 ├── CLAUDE.md              # Claude Code 개발 가이드
 ├── .env                    # 환경 변수 (API 키)
-├── requirements.txt        # 패키지 의존성 목록
+├── requirements.txt        # 패키지 의존성
 ├── README.md              # 프로젝트 문서
-├── knowledge/             # 핵심 데이터 파일
-│   ├── HS분류사례_part1.json ~ part10.json  # 국내 분류사례
-│   ├── HS위원회.json, HS협의회.json          # 위원회 결정사항
-│   ├── hs_classification_data_us.json       # 미국 관세청 데이터
-│   ├── hs_classification_data_eu.json       # EU 관세청 데이터
-│   ├── hstable.json                         # 관세율표 (병렬검색)
-│   ├── 통칙_grouped.json                     # HS 통칙
-│   └── grouped_11_end.json                  # HS 해설서
-├── 품목분류표_제작/        # 관세율표 데이터 처리
-└── previously/            # 이전 버전 백업
+└── knowledge/             # 핵심 데이터 파일
+    ├── HS분류사례_part1.json ~ part10.json  # 국내 분류사례
+    ├── HS위원회.json, HS협의회.json          # 위원회 결정사항
+    ├── hs_classification_data_us.json       # 미국 관세청 데이터
+    ├── hs_classification_data_eu.json       # EU 관세청 데이터
+    ├── hstable.json                         # 관세율표
+    ├── 통칙_grouped.json                     # HS 통칙
+    └── grouped_11_end.json                  # HS 해설서
 ```
 
-## ⚙️ 환경 설정
+---
 
-### 1. Google API 키 발급
-1. [Google AI Studio](https://makersuite.google.com/app/apikey) 접속
-2. API 키 생성
-3. `.env` 파일에 추가
+## 성능 최적화
 
-### 2. 데이터 준비
-- 관세청 공식 HS 분류 사례 데이터
-- 해외 관세청 분류 데이터
-- HS 해설서 및 통칙 데이터
+### Streamlit 캐싱
+- `@st.cache_resource`로 HSDataManager 최적화
+- 데이터 파일을 한 번만 로딩하여 메모리에 캐싱
+- 세션 간 재사용으로 초기 로딩 시간 단축
 
-### 3. 성능 최적화 및 고급 기능
-- **Streamlit 캐싱**: `@st.cache_resource`로 HSDataManager 최적화
-- **Multi Agents 시스템**: 대용량 데이터를 5개 그룹으로 병렬 처리
-- **병렬 검색 엔진**: 관세율표 + 해설서 동시 검색으로 정확도 향상
-- **실시간 로깅**: 모든 AI 처리 과정의 투명한 시각화
+### 병렬 처리
+- ThreadPoolExecutor로 Multi-Agent 동시 실행
+- `max_workers=3`으로 CPU 효율 극대화
+- `as_completed`로 먼저 완료된 작업부터 처리
 
-## 📄 라이선스
+### 세션 상태 관리
+- `st.session_state`로 대화 컨텍스트 누적 관리
+- Multi-Agent 분석 결과를 세션에 저장하여 재활용
+- 채팅 기록 유지로 연속적인 대화 지원
+
+---
+
+## 라이선스
 
 이 프로젝트는 MIT 라이선스를 따릅니다.
-
