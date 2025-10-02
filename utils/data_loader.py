@@ -4,6 +4,7 @@ import os
 from typing import Dict, List, Any
 from collections import defaultdict
 from dotenv import load_dotenv
+from .tfidf_search import TfidfSearchEngine
 
 # 환경 변수 로드
 load_dotenv()
@@ -12,16 +13,23 @@ class HSDataManager:
     """
     HS 코드 관련 데이터를 관리하는 클래스
     - HS 분류 사례, 위원회 결정, 협의회 결정 등의 데이터를 로드하고 관리
-    - 키워드 기반 검색 기능 제공
+    - TF-IDF 기반 검색 기능 제공 (Character n-gram)
     - 관련 컨텍스트 생성 기능 제공
     """
 
     def __init__(self):
         """HSDataManager 초기화"""
         self.data = {}  # 모든 HS 관련 데이터를 저장하는 딕셔너리
-        self.search_index = defaultdict(list)  # 키워드 기반 검색을 위한 인덱스
+        self.search_index = defaultdict(list)  # 키워드 기반 검색을 위한 인덱스 (하위 호환)
+
+        # TF-IDF 검색 엔진
+        self.domestic_tfidf = None  # 국내 사례용
+        self.overseas_tfidf = None  # 해외 사례용
+        self.manual_tfidf = None    # HS 매뉴얼용
+
         self.load_all_data()  # 모든 데이터 파일 로드
-        self.build_search_index()  # 검색 인덱스 구축
+        self.build_search_index()  # 키워드 검색 인덱스 구축 (하위 호환)
+        self.build_tfidf_indexes()  # TF-IDF 인덱스 구축
 
     def load_all_data(self):
         """
@@ -255,3 +263,111 @@ class HSDataManager:
             context.append(f"출처: {result['source']}\n항목: {json.dumps(result['item'], ensure_ascii=False)}")
 
         return "\n\n".join(context)
+
+    def build_tfidf_indexes(self):
+        """
+        TF-IDF 검색 인덱스 구축
+        - 국내 사례, 해외 사례, HS 매뉴얼 각각 별도 인덱스 구축
+        """
+        # 1. 국내 HS 분류 사례 인덱스
+        domestic_docs = []
+        domestic_items = []
+
+        for i in range(1, 11):
+            key = f'HS분류사례_part{i}'
+            if key in self.data:
+                for item in self.data[key]:
+                    # 문서 텍스트 생성
+                    text_parts = []
+                    if 'product_name' in item and item['product_name']:
+                        text_parts.append(item['product_name'])
+                    if 'description' in item and item['description']:
+                        text_parts.append(item['description'])
+                    if 'decision_reason' in item and item['decision_reason']:
+                        text_parts.append(item['decision_reason'])
+
+                    text = " ".join(text_parts)
+                    if text.strip():
+                        domestic_docs.append(text)
+                        domestic_items.append(item)
+
+        # 위원회, 협의회 데이터 추가
+        for key in ['knowledge/HS위원회', 'knowledge/HS협의회']:
+            if key in self.data:
+                for item in self.data[key]:
+                    text_parts = []
+                    if 'product_name' in item and item['product_name']:
+                        text_parts.append(item['product_name'])
+                    if 'description' in item and item['description']:
+                        text_parts.append(item['description'])
+                    if 'decision_reason' in item and item['decision_reason']:
+                        text_parts.append(item['decision_reason'])
+
+                    text = " ".join(text_parts)
+                    if text.strip():
+                        domestic_docs.append(text)
+                        domestic_items.append(item)
+
+        if domestic_docs:
+            self.domestic_tfidf = TfidfSearchEngine()
+            self.domestic_tfidf.fit(domestic_docs)
+            self.domestic_items = domestic_items
+
+        # 2. 해외 HS 분류 사례 인덱스
+        overseas_docs = []
+        overseas_items = []
+
+        for key in ['hs_classification_data_us', 'hs_classification_data_eu']:
+            if key in self.data:
+                for item in self.data[key]:
+                    text_parts = []
+                    if 'product_name' in item and item['product_name']:
+                        text_parts.append(item['product_name'])
+                    if 'description' in item and item['description']:
+                        text_parts.append(item['description'])
+                    if 'decision_reason' in item and item['decision_reason']:
+                        text_parts.append(item['decision_reason'])
+
+                    text = " ".join(text_parts)
+                    if text.strip():
+                        overseas_docs.append(text)
+                        overseas_items.append(item)
+
+        if overseas_docs:
+            self.overseas_tfidf = TfidfSearchEngine()
+            self.overseas_tfidf.fit(overseas_docs)
+            self.overseas_items = overseas_items
+
+    def search_domestic_tfidf(self, query: str, top_k: int = 100) -> List[Dict[str, Any]]:
+        """
+        TF-IDF 기반 국내 HS 분류 사례 검색
+
+        Args:
+            query: 검색 쿼리
+            top_k: 반환할 상위 결과 개수
+
+        Returns:
+            검색된 항목 리스트
+        """
+        if self.domestic_tfidf is None:
+            return []
+
+        results = self.domestic_tfidf.search(query, top_k)
+        return [self.domestic_items[idx] for idx, score in results]
+
+    def search_overseas_tfidf(self, query: str, top_k: int = 100) -> List[Dict[str, Any]]:
+        """
+        TF-IDF 기반 해외 HS 분류 사례 검색
+
+        Args:
+            query: 검색 쿼리
+            top_k: 반환할 상위 결과 개수
+
+        Returns:
+            검색된 항목 리스트
+        """
+        if self.overseas_tfidf is None:
+            return []
+
+        results = self.overseas_tfidf.search(query, top_k)
+        return [self.overseas_items[idx] for idx, score in results]

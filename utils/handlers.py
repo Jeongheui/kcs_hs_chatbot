@@ -1,6 +1,7 @@
 import streamlit as st
 import time
 import os
+import json
 from datetime import datetime
 from google import genai
 from google.genai import types
@@ -106,10 +107,23 @@ def handle_hs_classification_cases(user_input, context, hs_manager, ui_container
             progress_bar = st.progress(0, text="AI 그룹별 분석 진행 중...")
             responses_container = st.container()
 
+    # TF-IDF 기반 검색으로 상위 100개 사례 추출
+    top_cases = hs_manager.search_domestic_tfidf(user_input, top_k=100)
+
+    # 5개 그룹으로 분할 (각 그룹 20개)
+    group_size = len(top_cases) // 5
+    groups = [top_cases[i*group_size:(i+1)*group_size if i < 4 else len(top_cases)] for i in range(5)]
+
     # 병렬 처리용 함수
     def process_single_group(i):
         try:
-            relevant = hs_manager.get_domestic_context_group(user_input, i)
+            # 그룹 데이터를 컨텍스트로 변환
+            group_cases = groups[i]
+            relevant = "\n\n".join([
+                f"출처: 국내 관세청\n항목: {json.dumps(case, ensure_ascii=False)}"
+                for case in group_cases
+            ])
+
             prompt = f"{domestic_context}\n\n관련 데이터 (국내 관세청, 그룹{i+1}):\n{relevant}\n\n사용자: {user_input}\n"
 
             start_time = datetime.now()
@@ -256,10 +270,23 @@ def handle_overseas_hs(user_input, context, hs_manager, ui_container=None):
             progress_bar = st.progress(0, text="AI 그룹별 분석 진행 중...")
             responses_container = st.container()
 
+    # TF-IDF 기반 검색으로 상위 100개 사례 추출
+    top_cases = hs_manager.search_overseas_tfidf(user_input, top_k=100)
+
+    # 5개 그룹으로 분할 (각 그룹 20개)
+    group_size = len(top_cases) // 5
+    groups = [top_cases[i*group_size:(i+1)*group_size if i < 4 else len(top_cases)] for i in range(5)]
+
     # 병렬 처리용 함수
     def process_single_group(i):
         try:
-            relevant = hs_manager.get_overseas_context_group(user_input, i)
+            # 그룹 데이터를 컨텍스트로 변환
+            group_cases = groups[i]
+            relevant = "\n\n".join([
+                f"출처: 해외 관세청\n항목: {json.dumps(case, ensure_ascii=False)}"
+                for case in group_cases
+            ])
+
             prompt = f"{overseas_context}\n\n관련 데이터 (해외 관세청, 그룹{i+1}):\n{relevant}\n\n사용자: {user_input}\n"
 
             start_time = datetime.now()

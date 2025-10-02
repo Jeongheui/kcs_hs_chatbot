@@ -50,9 +50,10 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # HS 데이터 매니저 초기화 (캐싱을 통해 성능 최적화)
-@st.cache_resource
+@st.cache_resource(show_spinner=False)
 def get_hs_manager():
-    return HSDataManager()
+    with st.spinner("🔧 TF-IDF 검색 인덱스 구축 중... (최초 1회, 5-15초 소요)"):
+        return HSDataManager()
 
 # 세션 상태 초기화
 if 'chat_history' not in st.session_state:
