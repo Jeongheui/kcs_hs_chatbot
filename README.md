@@ -80,9 +80,15 @@ LED 조명이 내장된 피규어 하우스 무드등을 수입하려는데, 정
 - **Google Gemini 2.5 Flash 무료 API** 사용
 - 추가 인프라 비용 없음
 
+### 🔍 TF-IDF로 정확하게 검색합니다
+- **복합어 정확 검색**: "폴리우레탄폼" 띄어쓰기 없이 인식
+- **중요도 기반 순위화**: 문서별 단어 빈도(TF)와 희소성(IDF) 계산
+- 단순한 키워드 검색 대비 월등한 정확도
+
 ### 🤖 Multi-Agent로 정확하고 빠릅니다
-- **5개 그룹 병렬 분석** (최대 3개 동시 실행)
-- **Head Agent**가 모든 결과를 종합 판단
+- 전체 데이터(~900건)에서 **TF-IDF로 상위 100개 사례 추출**
+- **5그룹(각 20개 사례)으로 분할 후 병렬 분석**
+- **Head Agent**가 5개 분석 결과 종합
 
 ### 📊 신뢰할 수 있는 공식 데이터 소스
 
@@ -119,6 +125,7 @@ pip install -r requirements.txt
 - `google-genai` - Gemini API 클라이언트
 - `streamlit` - 웹 UI 프레임워크
 - `python-dotenv` - 환경 변수 관리
+- `scikit-learn` - TF-IDF 검색 엔진
 - `numpy`, `pandas`, `requests` - 데이터 처리
 
 ---
@@ -174,12 +181,14 @@ streamlit run main.py
 
 ### 🇰🇷 2. 국내 HS 분류사례 검색
 - 관세청 품목분류 사례 987건 데이터베이스 분석
-- Multi-Agent 시스템: 데이터를 5개 그룹으로 분할하여 병렬 검색
+- **TF-IDF Character n-gram 검색**: 복합어 정확 매칭 ("폴리우레탄폼", "리튬이온배터리")
+- Multi-Agent 시스템: TF-IDF 상위 100개 사례를 5개 그룹으로 분할 병렬 분석
 - Head Agent가 최종 취합하여 전문적인 HS 코드 분류 답변 제공
 
 ### 🌍 3. 해외 HS 분류사례 검색
 - 미국 CBP 및 EU BTI 품목분류 사례 1,900건 분석
-- Multi-Agent 시스템: 해외 데이터를 5개 그룹으로 분할 분석
+- **TF-IDF Character n-gram 검색**: 해외 사례 정밀 검색
+- Multi-Agent 시스템: TF-IDF 상위 100개를 5개 그룹으로 분할 분석
 - 국제적인 HS 분류 동향 및 비교 분석 제공
 
 ### 📚 4. HS 해설서 분석 (사용자 제시 코드)
@@ -198,6 +207,37 @@ streamlit run main.py
 
 ---
 
+## 🔬 핵심 기술 상세
+
+### TF-IDF Character n-gram 검색
+
+**도입 배경:**
+- 기존 키워드 검색의 한계: "폴리우레탄폼" 검색 시 정확히 일치하는 문서만 검색
+- 한국어 형태소 분석기 사용 시 속도 저하 (수십 초 소요)
+
+**Character n-gram 방식:**
+- 2~4 글자 단위로 텍스트 분해 (예: "리튬이온배터리" → "리튬", "튬이", "이온", "온배", "배터", ...)
+- 복합어 부분 매칭 지원
+
+**적용 범위:**
+- ✅ 국내 HS 분류사례 검색
+- ✅ 해외 HS 분류사례 검색
+- ⚪ HS 해설서는 키워드 검색 유지 (원문 조회 목적)
+
+### Multi-Agent 시스템
+
+**병렬 처리 구조:**
+1. 전체 데이터(~900건)에서 TF-IDF로 상위 100개 사례 추출 (0.02초)
+2. 100개 사례를 5개 그룹으로 분할 (각 그룹 20개 사례)
+3. 5개 Group Agent가 병렬 분석 (최대 3개 동시, ThreadPoolExecutor)
+4. Head Agent가 5개 분석 결과 종합 → 최종 답변
+
+**사용 모델:**
+- Group Agent: Gemini 2.5 Flash (빠른 분석)
+- Head Agent: Gemini 2.5 Flash (종합 판단)
+
+---
+
 ## 📂 프로젝트 구조
 
 ```
@@ -205,7 +245,8 @@ kcs_hs_chatbot/
 ├── main.py                 # Streamlit 메인 애플리케이션
 ├── utils/                  # 유틸리티 모듈 패키지
 │   ├── __init__.py         # 모듈 통합 및 export
-│   ├── data_loader.py      # HSDataManager 클래스
+│   ├── data_loader.py      # HSDataManager 클래스 (TF-IDF 인덱스 구축)
+│   ├── tfidf_search.py     # Character n-gram TF-IDF 검색 엔진
 │   ├── handlers.py         # 질문 유형별 처리 함수 (Multi-Agent)
 │   ├── question_classifier.py  # LLM 기반 질문 자동 분류
 │   ├── hs_manual_utils.py  # HS 해설서 관련 함수들
