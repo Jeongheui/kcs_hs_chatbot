@@ -52,8 +52,13 @@ st.markdown("""
 # HS 데이터 매니저 초기화 (캐싱을 통해 성능 최적화)
 @st.cache_resource(show_spinner=False)
 def get_hs_manager():
-    with st.spinner("🔧 TF-IDF 검색 인덱스 구축 중... (최초 1회, 5-15초 소요)"):
-        return HSDataManager()
+    import os
+    if os.path.exists('tfidf_indexes.pkl.gz') or os.path.exists('tfidf_indexes.pkl'):
+        with st.spinner("📂 TF-IDF 인덱스 로딩 중... (1초 이내)"):
+            return HSDataManager()
+    else:
+        with st.spinner("🔧 TF-IDF 검색 인덱스 구축 중... (최초 1회, 5-15초 소요)"):
+            return HSDataManager()
 
 # 세션 상태 초기화
 if 'chat_history' not in st.session_state:
@@ -242,25 +247,6 @@ with st.sidebar:
     st.markdown("---")
 
     st.markdown("""
-    ### 🚀 핵심 기술
-
-    **TF-IDF Character n-gram**
-    - 복합어 정확 검색 (예: "폴리우레탄폼" 띄어쓰기 없이 인식)
-    - 문서별 단어 중요도 계산
-      - TF: 문서 내 반복 빈도 (예: "리튬"이 10번 등장 → 중요)
-      - IDF: 희소성 가중치 (예: "제품"은 모든 문서에 등장 → 덜 중요)
-
-    **Multi-Agent 시스템**
-    - 전체 데이터(~900건)에서 TF-IDF로 상위 100개 사례 추출
-    - 5그룹(각 20개 사례)으로 분할 후 병렬 분석
-    - Head Agent가 5개 분석 결과 종합
-
-    **Gemini AI 2.5 Flash**
-    - Google 최신 LLM 모델
-    - 빠른 응답 + 높은 정확도
-
-    ---
-
     ### 📚 보유 데이터
 
     **국내 분류사례**
@@ -281,6 +267,25 @@ with st.sidebar:
 
     **실시간 웹 데이터**
     - Google Search API 연동
+
+    ---
+
+    ### 🚀 핵심 기술
+
+    **TF-IDF Character n-gram**
+    - 복합어 정확 검색 (예: "폴리우레탄폼" 띄어쓰기 없이 인식)
+    - 문서별 단어 중요도 계산
+      - TF: 문서 내 반복 빈도 (예: "리튬"이 10번 등장 → 중요)
+      - IDF: 희소성 가중치 (예: "제품"은 모든 문서에 등장 → 덜 중요)
+
+    **Multi-Agent 시스템**
+    - 전체 데이터(~900건)에서 TF-IDF로 상위 100개 사례 추출
+    - 5그룹(각 20개 사례)으로 분할 후 병렬 분석
+    - Head Agent가 5개 분석 결과 종합
+
+    **Gemini AI 2.5 Flash**
+    - Google 최신 LLM 모델
+    - 빠른 응답 + 높은 정확도
 
     ---
 

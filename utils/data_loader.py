@@ -1,6 +1,8 @@
 import json
 import re
 import os
+import pickle
+import gzip
 from typing import Dict, List, Any
 from collections import defaultdict
 from dotenv import load_dotenv
@@ -26,10 +28,17 @@ class HSDataManager:
         self.domestic_tfidf = None  # 국내 사례용
         self.overseas_tfidf = None  # 해외 사례용
         self.manual_tfidf = None    # HS 매뉴얼용
+        self.domestic_items = []    # 국내 사례 아이템
+        self.overseas_items = []    # 해외 사례 아이템
 
         self.load_all_data()  # 모든 데이터 파일 로드
         self.build_search_index()  # 키워드 검색 인덱스 구축 (하위 호환)
-        self.build_tfidf_indexes()  # TF-IDF 인덱스 구축
+
+        # TF-IDF 인덱스: pickle 파일이 있으면 로드, 없으면 구축
+        if os.path.exists('tfidf_indexes.pkl.gz') or os.path.exists('tfidf_indexes.pkl'):
+            self._load_tfidf_indexes()
+        else:
+            self.build_tfidf_indexes()
 
     def load_all_data(self):
         """
@@ -264,6 +273,31 @@ class HSDataManager:
 
         return "\n\n".join(context)
 
+    def _load_tfidf_indexes(self):
+        """
+        사전에 구축된 TF-IDF 인덱스를 pickle 파일에서 로드
+        """
+        try:
+            # gzip 압축 파일 우선 시도
+            if os.path.exists('tfidf_indexes.pkl.gz'):
+                with gzip.open('tfidf_indexes.pkl.gz', 'rb') as f:
+                    indexes = pickle.load(f)
+            # 기존 비압축 파일 호환성 유지
+            elif os.path.exists('tfidf_indexes.pkl'):
+                with open('tfidf_indexes.pkl', 'rb') as f:
+                    indexes = pickle.load(f)
+            else:
+                raise FileNotFoundError("No index file found")
+
+            self.domestic_tfidf = indexes['domestic_tfidf']
+            self.domestic_items = indexes['domestic_items']
+            self.overseas_tfidf = indexes['overseas_tfidf']
+            self.overseas_items = indexes['overseas_items']
+        except Exception as e:
+            print(f"Warning: Failed to load TF-IDF indexes: {e}")
+            print("Building indexes from scratch...")
+            self.build_tfidf_indexes()
+
     def build_tfidf_indexes(self):
         """
         TF-IDF 검색 인덱스 구축
@@ -337,6 +371,23 @@ class HSDataManager:
             self.overseas_tfidf = TfidfSearchEngine()
             self.overseas_tfidf.fit(overseas_docs)
             self.overseas_items = overseas_items
+
+        # 3. 구축한 인덱스를 gzip 압축하여 pickle 파일로 저장
+        try:
+            with gzip.open('tfidf_indexes.pkl.gz', 'wb', compresslevel=9) as f:
+                pickle.dump({
+                    'domestic_tfidf': self.domestic_tfidf,
+                    'domestic_items': self.domestic_items,
+                    'overseas_tfidf': self.overseas_tfidf,
+                    'overseas_items': self.overseas_items
+                }, f, protocol=pickle.HIGHEST_PROTOCOL)
+
+            # 파일 크기 정보 출력
+            size_mb = os.path.getsize('tfidf_indexes.pkl.gz') / (1024 * 1024)
+            print(f"✅ TF-IDF 인덱스가 tfidf_indexes.pkl.gz 파일로 저장되었습니다.")
+            print(f"   파일 크기: {size_mb:.2f} MB")
+        except Exception as e:
+            print(f"⚠️ TF-IDF 인덱스 저장 실패: {e}")
 
     def search_domestic_tfidf(self, query: str, top_k: int = 100) -> List[Dict[str, Any]]:
         """

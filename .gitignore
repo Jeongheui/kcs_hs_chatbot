@@ -5,3 +5,4 @@ __pycache__/
 .python-version
 previously/
 CLAUDE.md
+tfidf_indexes.pkl
