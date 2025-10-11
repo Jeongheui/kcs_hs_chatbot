@@ -2,6 +2,7 @@ import streamlit as st
 import time
 import os
 import json
+import re
 from datetime import datetime
 from google import genai
 from google.genai import types
@@ -107,8 +108,8 @@ def handle_hs_classification_cases(user_input, context, hs_manager, ui_container
             progress_bar = st.progress(0, text="AI 그룹별 분석 진행 중...")
             responses_container = st.container()
 
-    # TF-IDF 기반 검색으로 상위 100개 사례 추출
-    top_cases = hs_manager.search_domestic_tfidf(user_input, top_k=100)
+    # TF-IDF 기반 검색으로 상위 100개 사례 추출 (임계값 0.05로 낮춤 - AI가 더 많은 데이터 분석)
+    top_cases = hs_manager.search_domestic_tfidf(user_input, top_k=100, min_similarity=0.05)
 
     # 5개 그룹으로 분할 (각 그룹 20개)
     group_size = len(top_cases) // 5
@@ -270,8 +271,8 @@ def handle_overseas_hs(user_input, context, hs_manager, ui_container=None):
             progress_bar = st.progress(0, text="AI 그룹별 분석 진행 중...")
             responses_container = st.container()
 
-    # TF-IDF 기반 검색으로 상위 100개 사례 추출
-    top_cases = hs_manager.search_overseas_tfidf(user_input, top_k=100)
+    # TF-IDF 기반 검색으로 상위 100개 사례 추출 (임계값 0.05로 낮춤 - AI가 더 많은 데이터 분석)
+    top_cases = hs_manager.search_overseas_tfidf(user_input, top_k=100, min_similarity=0.05)
 
     # 5개 그룹으로 분할 (각 그룹 20개)
     group_size = len(top_cases) // 5
@@ -447,5 +448,258 @@ def handle_hs_manual_with_user_codes(user_input, context, hs_manager, logger, ex
     logger.log_actual("SUCCESS", "User-provided codes analysis completed", f"{len(final_answer)} chars")
     return final_answer
 
-# This function has been removed as parallel search with item description only
-# resulted in poor performance and excessive API calls.
+
+def handle_domestic_case_lookup(user_input, hs_manager):
+    """국내 분류사례 원문 검색 처리 함수"""
+
+    # 1. 참고문서번호 직접 검색
+    ref_pattern = r'품목분류\d+과-\d+'
+    match = re.search(ref_pattern, user_input)
+
+    if match:
+        ref_id = match.group()
+        case = hs_manager.find_domestic_case_by_id(ref_id)
+        if case:
+            # 참고문서번호 유효성 검증 (데이터 오류 필터링)
+            if case.get('reference_id') and case['reference_id'] != '-1':
+                return format_domestic_case_detail(case)
+            else:
+                return f"⚠️ 참고문서번호 '{ref_id}'의 데이터에 문제가 있습니다.\n\n키워드 검색을 시도해주세요."
+        else:
+            return f"⚠️ 참고문서번호 '{ref_id}'에 해당하는 사례를 찾을 수 없습니다.\n\n다른 문서번호나 키워드로 다시 검색해주세요."
+
+    # 2. 키워드 기반 단순 문자열 검색
+    results = hs_manager.search_domestic_by_keyword(user_input, top_k=10)
+
+    if not results:
+        return f"""⚠️ **"{user_input}"에 대한 검색 결과가 없습니다**
+
+**가능한 원인:**
+- 해당 키워드가 포함된 분류사례가 데이터에 없습니다
+- 검색어가 원문에 정확히 일치하지 않습니다
+
+**검색 팁:**
+- 품목명의 핵심 키워드 사용 (예: '섬유유연제', '폴리아미드')
+- 영문 품목명 시도 (예: 'softening', 'polyamide')
+- 더 짧고 일반적인 단어 사용 (예: '머그컵' → '컵', 'mug')
+- 띄어쓰기 변경 시도 (예: '폴리아미드호스' → '폴리아미드 호스')
+
+**다른 검색 방법:**
+- **국내 분류사례 기반 HS 추천**: AI가 유사 사례를 분석하여 HS코드 추천 (TF-IDF 사용)
+- **웹 검색**: 최신 정보 및 일반 품목 정보 검색"""
+
+    return format_domestic_case_list(results, query=user_input)
+
+
+def format_domestic_case_detail(case):
+    """국내 사례 상세 포맷"""
+    return f"""---
+## 📋 국내 분류사례 상세 정보
+
+### 기본 정보
+- **참고문서번호**: {case.get('reference_id', 'N/A')}
+- **결정일자**: {case.get('decision_date', 'N/A')}
+- **결정기관**: {case.get('organization', 'N/A')}
+- **HS 코드**: {case.get('hs_code', 'N/A')}
+
+---
+
+### 품목명
+{case.get('product_name', 'N/A')}
+
+---
+
+### 품목 설명
+{case.get('description', 'N/A')}
+
+---
+
+### 분류 근거
+{case.get('decision_reason', 'N/A')}
+"""
+
+
+def format_domestic_case_list(results, query):
+    """국내 사례 목록 포맷 (Expander 방식)"""
+    output = f"## 🔍 \"{query}\" 검색 결과 ({len(results)}건)\n\n"
+
+    for idx, case in enumerate(results, 1):
+        product_name = case.get('product_name', 'N/A')
+        description = case.get('description', 'N/A')
+        ref_id = case.get('reference_id', 'N/A')
+        hs_code = case.get('hs_code', 'N/A')
+        decision_date = case.get('decision_date', 'N/A')
+
+        # 품목명이 너무 길면 자르기 (Expander 제목용)
+        product_name_display = product_name[:60] + "..." if len(product_name) > 60 else product_name
+
+        # Expander 제목
+        output += f"<details><summary><b>{idx}위. {ref_id}</b> | HS {hs_code} | {product_name_display}</summary>\n\n"
+
+        # Expander 내용 (전체 상세 정보)
+        output += format_domestic_case_detail(case)
+
+        output += "\n</details>\n\n"
+
+    output += "\n💡 **각 항목을 클릭하면 상세 정보를 확인할 수 있습니다.**"
+    return output
+
+
+def handle_overseas_case_lookup(user_input, hs_manager):
+    """해외 분류사례 원문 검색 처리 함수"""
+
+    # 1. 참고문서번호 검색 (미국/EU 패턴)
+    us_pattern = r'(NY|HQ|LA|SF|N)\s+[A-Z]?\d+'
+    match = re.search(us_pattern, user_input, re.IGNORECASE)
+
+    if match:
+        ref_id = match.group()
+        result = hs_manager.find_overseas_case_by_id(ref_id)
+        if result:
+            return format_overseas_case_detail(result['case'], result['country'])
+        else:
+            return f"⚠️ 참고문서번호 '{ref_id}'에 해당하는 사례를 찾을 수 없습니다.\n\n다른 문서번호나 키워드로 다시 검색해주세요."
+
+    # 2. HS 코드 검색
+    hs_pattern = r'\b\d{4}(\.\d{2}){0,2}\b'
+    match = re.search(hs_pattern, user_input)
+
+    if match:
+        hs_code = match.group()
+        results = hs_manager.search_overseas_by_hs_code(hs_code, top_k=10)
+        if results:
+            return format_overseas_case_list_by_hs(results, hs_code)
+
+    # 3. 키워드 기반 단순 문자열 검색
+    results = hs_manager.search_overseas_by_keyword(user_input, top_k=10)
+
+    if not results:
+        return f"""⚠️ **"{user_input}"에 대한 검색 결과가 없습니다**
+
+**가능한 원인:**
+- 해당 키워드가 포함된 분류사례가 데이터에 없습니다
+- 검색어가 원문에 정확히 일치하지 않습니다
+
+**검색 팁:**
+- 영문 품목명 사용 (예: 'fabric', 'textile', 'bag')
+- 더 짧고 일반적인 단어 사용 (예: 'ceramic mug' → 'mug', 'ceramic')
+- 띄어쓰기 변경 시도
+- HS 코드로 검색 (예: '5515.12', '4202.92')
+- 참고문서번호로 검색 (예: 'NY N338825')
+
+**다른 검색 방법:**
+- **해외 분류사례 기반 HS 추천**: AI가 유사 사례를 분석하여 HS코드 추천 (TF-IDF 사용)
+- **웹 검색**: 최신 정보 및 일반 품목 정보 검색"""
+
+    # 결과를 국가별로 분리
+    us_results = []
+    eu_results = []
+
+    for item in results:
+        # 원본 데이터에서 국가 판단
+        if 'hs_classification_data_us' in str(item) or item.get('organization', '').startswith('New York'):
+            us_results.append(item)
+        else:
+            eu_results.append(item)
+
+    return format_overseas_case_list(us_results, eu_results, query=user_input)
+
+
+def format_overseas_case_detail(case, country):
+    """해외 사례 상세 포맷"""
+    country_flag = "🇺🇸" if country == "US" else "🇪🇺"
+    country_name = "미국 CBP" if country == "US" else "EU 관세청"
+
+    return f"""---
+## {country_flag} {country_name} 분류사례 상세 정보
+
+### 기본 정보
+- **참고문서번호**: {case.get('reference_id', 'N/A')}
+- **결정일자**: {case.get('decision_date', 'N/A')}
+- **결정기관**: {case.get('organization', 'N/A')}
+- **HS 코드**: {case.get('hs_code', 'N/A')}
+- **연도**: {case.get('year', 'N/A')}
+
+---
+
+### 요약
+{case.get('reply', 'N/A')}
+
+---
+
+### 상세 내용
+{case.get('description', 'N/A')}
+"""
+
+
+def format_overseas_case_list_by_hs(results, hs_code):
+    """HS 코드 기반 해외 사례 목록 포맷 (Expander 방식)"""
+    output = f"## 🔍 HS 코드 \"{hs_code}\" 검색 결과 ({len(results)}건)\n\n"
+
+    us_count = sum(1 for r in results if r['country'] == 'US')
+    eu_count = len(results) - us_count
+
+    output += f"- 🇺🇸 미국: {us_count}건\n"
+    output += f"- 🇪🇺 EU: {eu_count}건\n\n"
+
+    for idx, item in enumerate(results, 1):
+        case = item['case']
+        country = item['country']
+        flag = "🇺🇸" if country == "US" else "🇪🇺"
+
+        reply = case.get('reply', 'N/A')
+        reply_short = reply[:80] + "..." if len(reply) > 80 else reply
+        ref_id = case.get('reference_id', 'N/A')
+        hs_code_display = case.get('hs_code', 'N/A')
+
+        # Expander 제목
+        output += f"<details><summary><b>{idx}위 {flag}. {ref_id}</b> | HS {hs_code_display} | {reply_short}</summary>\n\n"
+
+        # Expander 내용 (전체 상세 정보)
+        output += format_overseas_case_detail(case, country)
+
+        output += "\n</details>\n\n"
+
+    output += "\n💡 **각 항목을 클릭하면 상세 정보를 확인할 수 있습니다.**"
+    return output
+
+
+def format_overseas_case_list(us_results, eu_results, query):
+    """키워드 기반 해외 사례 목록 포맷 (국가별 구분, Expander 방식)"""
+    total_count = len(us_results) + len(eu_results)
+    output = f"## 🔍 \"{query}\" 검색 결과 ({total_count}건)\n\n"
+
+    if us_results:
+        output += f"### 🇺🇸 미국 ({len(us_results)}건)\n\n"
+        for idx, case in enumerate(us_results, 1):
+            reply = case.get('reply', 'N/A')
+            reply_short = reply[:60] + "..." if len(reply) > 60 else reply
+            ref_id = case.get('reference_id', 'N/A')
+            hs_code = case.get('hs_code', 'N/A')
+
+            # Expander 제목
+            output += f"<details><summary><b>{idx}위. {ref_id}</b> | HS {hs_code} | {reply_short}</summary>\n\n"
+
+            # Expander 내용
+            output += format_overseas_case_detail(case, 'US')
+
+            output += "\n</details>\n\n"
+
+    if eu_results:
+        output += f"\n---\n\n### 🇪🇺 EU ({len(eu_results)}건)\n\n"
+        for idx, case in enumerate(eu_results, 1):
+            reply = case.get('reply', 'N/A')
+            reply_short = reply[:60] + "..." if len(reply) > 60 else reply
+            ref_id = case.get('reference_id', 'N/A')
+            hs_code = case.get('hs_code', 'N/A')
+
+            # Expander 제목
+            output += f"<details><summary><b>{idx}위. {ref_id}</b> | HS {hs_code} | {reply_short}</summary>\n\n"
+
+            # Expander 내용
+            output += format_overseas_case_detail(case, 'EU')
+
+            output += "\n</details>\n\n"
+
+    output += "\n💡 **각 항목을 클릭하면 상세 정보를 확인할 수 있습니다.**"
+    return output

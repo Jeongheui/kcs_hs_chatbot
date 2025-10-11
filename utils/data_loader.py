@@ -389,13 +389,14 @@ class HSDataManager:
         except Exception as e:
             print(f"⚠️ TF-IDF 인덱스 저장 실패: {e}")
 
-    def search_domestic_tfidf(self, query: str, top_k: int = 100) -> List[Dict[str, Any]]:
+    def search_domestic_tfidf(self, query: str, top_k: int = 100, min_similarity: float = 0.1) -> List[Dict[str, Any]]:
         """
         TF-IDF 기반 국내 HS 분류 사례 검색
 
         Args:
             query: 검색 쿼리
             top_k: 반환할 상위 결과 개수
+            min_similarity: 최소 유사도 임계값 (기본값 0.1)
 
         Returns:
             검색된 항목 리스트
@@ -403,16 +404,17 @@ class HSDataManager:
         if self.domestic_tfidf is None:
             return []
 
-        results = self.domestic_tfidf.search(query, top_k)
+        results = self.domestic_tfidf.search(query, top_k, min_similarity)
         return [self.domestic_items[idx] for idx, score in results]
 
-    def search_overseas_tfidf(self, query: str, top_k: int = 100) -> List[Dict[str, Any]]:
+    def search_overseas_tfidf(self, query: str, top_k: int = 100, min_similarity: float = 0.1) -> List[Dict[str, Any]]:
         """
         TF-IDF 기반 해외 HS 분류 사례 검색
 
         Args:
             query: 검색 쿼리
             top_k: 반환할 상위 결과 개수
+            min_similarity: 최소 유사도 임계값 (기본값 0.1)
 
         Returns:
             검색된 항목 리스트
@@ -420,5 +422,143 @@ class HSDataManager:
         if self.overseas_tfidf is None:
             return []
 
-        results = self.overseas_tfidf.search(query, top_k)
+        results = self.overseas_tfidf.search(query, top_k, min_similarity)
         return [self.overseas_items[idx] for idx, score in results]
+
+    def search_domestic_by_keyword(self, keyword: str, top_k: int = 10) -> List[Dict[str, Any]]:
+        """
+        키워드 기반 단순 문자열 포함 검색 (국내 분류사례)
+
+        Args:
+            keyword: 검색할 키워드
+            top_k: 반환할 최대 결과 개수
+
+        Returns:
+            키워드가 포함된 사례 리스트
+        """
+        domestic_sources = [
+            'HS분류사례_part1', 'HS분류사례_part2', 'HS분류사례_part3', 'HS분류사례_part4', 'HS분류사례_part5',
+            'HS분류사례_part6', 'HS분류사례_part7', 'HS분류사례_part8', 'HS분류사례_part9', 'HS분류사례_part10',
+            'knowledge/HS위원회', 'knowledge/HS협의회'
+        ]
+
+        results = []
+        keyword_lower = keyword.lower()
+
+        for source in domestic_sources:
+            if source in self.data:
+                for item in self.data[source]:
+                    # 품목명, 설명, 분류근거에서 키워드 검색 (대소문자 구분 없음)
+                    searchable_text = ' '.join([
+                        str(item.get('product_name', '')),
+                        str(item.get('description', '')),
+                        str(item.get('decision_reason', ''))
+                    ]).lower()
+
+                    if keyword_lower in searchable_text:
+                        results.append(item)
+                        if len(results) >= top_k:
+                            return results
+
+        return results
+
+    def find_domestic_case_by_id(self, ref_id: str) -> Dict[str, Any]:
+        """
+        참고문서번호로 국내 분류사례 검색
+
+        Args:
+            ref_id: 참고문서번호 (예: "품목분류2과-9433")
+
+        Returns:
+            해당 사례 딕셔너리 또는 None
+        """
+        domestic_sources = [
+            'HS분류사례_part1', 'HS분류사례_part2', 'HS분류사례_part3', 'HS분류사례_part4', 'HS분류사례_part5',
+            'HS분류사례_part6', 'HS분류사례_part7', 'HS분류사례_part8', 'HS분류사례_part9', 'HS분류사례_part10',
+            'knowledge/HS위원회', 'knowledge/HS협의회'
+        ]
+
+        for source in domestic_sources:
+            if source in self.data:
+                for item in self.data[source]:
+                    if item.get('reference_id') == ref_id:
+                        return item
+        return None
+
+    def search_overseas_by_keyword(self, keyword: str, top_k: int = 10) -> List[Dict[str, Any]]:
+        """
+        키워드 기반 단순 문자열 포함 검색 (해외 분류사례)
+
+        Args:
+            keyword: 검색할 키워드
+            top_k: 반환할 최대 결과 개수
+
+        Returns:
+            키워드가 포함된 사례 리스트 (국가 정보 포함)
+        """
+        results = []
+        keyword_lower = keyword.lower()
+
+        for source in ['hs_classification_data_us', 'hs_classification_data_eu']:
+            if source in self.data:
+                country = 'US' if 'us' in source else 'EU'
+                for item in self.data[source]:
+                    # 품목명, 설명, 분류근거에서 키워드 검색 (대소문자 구분 없음)
+                    searchable_text = ' '.join([
+                        str(item.get('product_name', '')),
+                        str(item.get('description', '')),
+                        str(item.get('reply', ''))
+                    ]).lower()
+
+                    if keyword_lower in searchable_text:
+                        results.append(item)
+                        if len(results) >= top_k:
+                            return results
+
+        return results
+
+    def find_overseas_case_by_id(self, ref_id: str) -> Dict[str, Any]:
+        """
+        참고문서번호로 해외 분류사례 검색
+
+        Args:
+            ref_id: 참고문서번호 (예: "NY N338825")
+
+        Returns:
+            {'case': 사례 딕셔너리, 'country': 'US'/'EU'} 또는 None
+        """
+        for source in ['hs_classification_data_us', 'hs_classification_data_eu']:
+            if source in self.data:
+                for item in self.data[source]:
+                    if item.get('reference_id') == ref_id:
+                        country = 'US' if 'us' in source else 'EU'
+                        return {'case': item, 'country': country}
+        return None
+
+    def search_overseas_by_hs_code(self, hs_code: str, top_k: int = 10) -> List[Dict[str, Any]]:
+        """
+        HS 코드로 해외 분류사례 검색
+
+        Args:
+            hs_code: HS 코드 (4-10자리, 예: "5515", "5515.12")
+            top_k: 반환할 최대 결과 개수
+
+        Returns:
+            매칭되는 사례 리스트 (국가 정보 포함)
+        """
+        results = []
+
+        for source in ['hs_classification_data_us', 'hs_classification_data_eu']:
+            if source in self.data:
+                country = 'US' if 'us' in source else 'EU'
+                for item in self.data[source]:
+                    item_hs_code = item.get('hs_code', '')
+                    # HS 코드 부분 매칭 (공백, 점, 하이픈 제거 후 비교)
+                    if hs_code.replace('.', '').replace(' ', '') in item_hs_code.replace('.', '').replace(' ', '').replace('-', ''):
+                        results.append({
+                            'case': item,
+                            'country': country
+                        })
+                        if len(results) >= top_k:
+                            return results
+        return results

@@ -49,13 +49,15 @@ class TfidfSearchEngine:
         self.tfidf_matrix = self.vectorizer.fit_transform(documents)
         return self
 
-    def search(self, query, top_k=10):
+    def search(self, query, top_k=10, min_similarity=0.1):
         """
-        유사도 기반 검색
+        유사도 기반 검색 (최소 임계값 필터링)
 
         Args:
             query: 검색 쿼리 (문자열)
             top_k: 반환할 상위 결과 개수
+            min_similarity: 최소 유사도 임계값 (0~1, 기본값 0.1)
+                          이 값보다 낮은 유사도를 가진 문서는 제외
 
         Returns:
             [(doc_id, similarity_score), ...]
@@ -66,12 +68,21 @@ class TfidfSearchEngine:
         query_vec = self.vectorizer.transform([query])
         similarities = cosine_similarity(query_vec, self.tfidf_matrix)[0]
 
-        # 상위 k개 인덱스 (유사도 높은 순)
-        top_indices = similarities.argsort()[-top_k:][::-1]
+        # 최소 임계값 이상인 문서만 필터링
+        valid_indices = [i for i, score in enumerate(similarities) if score >= min_similarity]
+
+        # 관련 문서가 없으면 빈 리스트 반환
+        if not valid_indices:
+            return []
+
+        # 필터링된 문서 중 상위 k개 인덱스 추출
+        valid_similarities = [(idx, similarities[idx]) for idx in valid_indices]
+        valid_similarities.sort(key=lambda x: x[1], reverse=True)
+        top_results = valid_similarities[:top_k]
 
         results = [
-            (self.doc_ids[idx], similarities[idx])
-            for idx in top_indices
+            (self.doc_ids[idx], score)
+            for idx, score in top_results
         ]
 
         return results
