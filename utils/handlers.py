@@ -19,6 +19,33 @@ from .hs_manual_utils import (
 )
 from .search_engines import ParallelHSSearcher
 
+# 키워드 하이라이트 함수
+def highlight_keywords(text, keywords):
+    """텍스트에서 키워드를 형광색으로 하이라이트 (토큰 기반)"""
+    if not text or not keywords:
+        return text
+
+    # 키워드가 문자열이면 공백으로 분리하여 토큰화
+    if isinstance(keywords, str):
+        # 특수문자 제거 및 공백 기준 분리
+        keywords = re.sub(r'[^\w\s]', ' ', keywords).split()
+        # 길이 2 이상인 토큰만 사용
+        keywords = [kw.strip() for kw in keywords if len(kw.strip()) >= 2]
+
+    if not keywords:
+        return text
+
+    result = text
+    # 각 토큰을 개별적으로 하이라이트
+    for keyword in keywords:
+        if not keyword or len(keyword.strip()) < 2:  # 너무 짧은 키워드는 스킵
+            continue
+        # 대소문자 구분 없이 치환 (re.IGNORECASE)
+        pattern = re.compile(re.escape(keyword), re.IGNORECASE)
+        result = pattern.sub(lambda m: f'<mark>{m.group()}</mark>', result)
+
+    return result
+
 # 환경 변수 로드
 load_dotenv()
 GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
@@ -462,7 +489,7 @@ def handle_domestic_case_lookup(user_input, hs_manager):
         if case:
             # 참고문서번호 유효성 검증 (데이터 오류 필터링)
             if case.get('reference_id') and case['reference_id'] != '-1':
-                return format_domestic_case_detail(case)
+                return format_domestic_case_detail(case, query=ref_id)
             else:
                 return f"⚠️ 참고문서번호 '{ref_id}'의 데이터에 문제가 있습니다.\n\n키워드 검색을 시도해주세요."
         else:
@@ -491,31 +518,45 @@ def handle_domestic_case_lookup(user_input, hs_manager):
     return format_domestic_case_list(results, query=user_input)
 
 
-def format_domestic_case_detail(case):
+def format_domestic_case_detail(case, query=None):
     """국내 사례 상세 포맷"""
+    # 키워드 하이라이트 적용
+    product_name = highlight_keywords(case.get('product_name', 'N/A'), query) if query else case.get('product_name', 'N/A')
+    description = highlight_keywords(case.get('description', 'N/A'), query) if query else case.get('description', 'N/A')
+    decision_reason = highlight_keywords(case.get('decision_reason', 'N/A'), query) if query else case.get('decision_reason', 'N/A')
+
     return f"""---
+<div class="case-detail">
+
 ## 📋 국내 분류사례 상세 정보
 
-### 기본 정보
-- **참고문서번호**: {case.get('reference_id', 'N/A')}
-- **결정일자**: {case.get('decision_date', 'N/A')}
-- **결정기관**: {case.get('organization', 'N/A')}
-- **HS 코드**: {case.get('hs_code', 'N/A')}
+<div class="info-table">
+
+| 항목 | 내용 |
+|------|------|
+| 📄 **참고문서번호** | {case.get('reference_id', 'N/A')} |
+| 📅 **결정일자** | {case.get('decision_date', 'N/A')} |
+| 🏛️ **결정기관** | {case.get('organization', 'N/A')} |
+| 🔢 **HS 코드** | {case.get('hs_code', 'N/A')} |
+
+</div>
 
 ---
 
-### 품목명
-{case.get('product_name', 'N/A')}
+### 📦 품목명
+{product_name}
 
 ---
 
-### 품목 설명
-{case.get('description', 'N/A')}
+### 📝 품목 설명
+{description}
 
 ---
 
-### 분류 근거
-{case.get('decision_reason', 'N/A')}
+### ⚖️ 분류 근거
+{decision_reason}
+
+</div>
 """
 
 
@@ -525,21 +566,38 @@ def format_domestic_case_list(results, query):
 
     for idx, case in enumerate(results, 1):
         product_name = case.get('product_name', 'N/A')
-        description = case.get('description', 'N/A')
         ref_id = case.get('reference_id', 'N/A')
         hs_code = case.get('hs_code', 'N/A')
         decision_date = case.get('decision_date', 'N/A')
 
         # 품목명이 너무 길면 자르기 (Expander 제목용)
         product_name_display = product_name[:60] + "..." if len(product_name) > 60 else product_name
+        # 제목에도 하이라이트 적용
+        product_name_display = highlight_keywords(product_name_display, query)
 
-        # Expander 제목
-        output += f"<details><summary><b>{idx}위. {ref_id}</b> | HS {hs_code} | {product_name_display}</summary>\n\n"
+        # 카드형 Expander
+        output += f"""<div class="case-card domestic">
+<details>
+<summary class="case-summary">
+<span class="arrow">▶</span>
+<span class="rank">{idx}위</span>
+<span class="ref-id">{ref_id}</span>
+<span class="hs-code">HS {hs_code}</span>
+<span class="product-name">{product_name_display}</span>
+<span class="date">{decision_date}</span>
+</summary>
 
-        # Expander 내용 (전체 상세 정보)
-        output += format_domestic_case_detail(case)
+<div class="case-content">
+"""
 
-        output += "\n</details>\n\n"
+        # Expander 내용 (전체 상세 정보, 하이라이트 적용)
+        output += format_domestic_case_detail(case, query=query)
+
+        output += """</div>
+</details>
+</div>
+
+"""
 
     output += "\n💡 **각 항목을 클릭하면 상세 정보를 확인할 수 있습니다.**"
     return output
@@ -556,7 +614,7 @@ def handle_overseas_case_lookup(user_input, hs_manager):
         ref_id = match.group()
         result = hs_manager.find_overseas_case_by_id(ref_id)
         if result:
-            return format_overseas_case_detail(result['case'], result['country'])
+            return format_overseas_case_detail(result['case'], result['country'], query=ref_id)
         else:
             return f"⚠️ 참고문서번호 '{ref_id}'에 해당하는 사례를 찾을 수 없습니다.\n\n다른 문서번호나 키워드로 다시 검색해주세요."
 
@@ -605,30 +663,43 @@ def handle_overseas_case_lookup(user_input, hs_manager):
     return format_overseas_case_list(us_results, eu_results, query=user_input)
 
 
-def format_overseas_case_detail(case, country):
+def format_overseas_case_detail(case, country, query=None):
     """해외 사례 상세 포맷"""
     country_flag = "🇺🇸" if country == "US" else "🇪🇺"
     country_name = "미국 CBP" if country == "US" else "EU 관세청"
 
+    # 키워드 하이라이트 적용
+    reply = highlight_keywords(case.get('reply', 'N/A'), query) if query else case.get('reply', 'N/A')
+    description = highlight_keywords(case.get('description', 'N/A'), query) if query else case.get('description', 'N/A')
+
     return f"""---
+<div class="case-detail">
+
 ## {country_flag} {country_name} 분류사례 상세 정보
 
-### 기본 정보
-- **참고문서번호**: {case.get('reference_id', 'N/A')}
-- **결정일자**: {case.get('decision_date', 'N/A')}
-- **결정기관**: {case.get('organization', 'N/A')}
-- **HS 코드**: {case.get('hs_code', 'N/A')}
-- **연도**: {case.get('year', 'N/A')}
+<div class="info-table">
+
+| 항목 | 내용 |
+|------|------|
+| 📄 **참고문서번호** | {case.get('reference_id', 'N/A')} |
+| 📅 **결정일자** | {case.get('decision_date', 'N/A')} |
+| 🏛️ **결정기관** | {case.get('organization', 'N/A')} |
+| 🔢 **HS 코드** | {case.get('hs_code', 'N/A')} |
+| 📆 **연도** | {case.get('year', 'N/A')} |
+
+</div>
 
 ---
 
-### 요약
-{case.get('reply', 'N/A')}
+### 📋 요약
+{reply}
 
 ---
 
-### 상세 내용
-{case.get('description', 'N/A')}
+### 📝 상세 내용
+{description}
+
+</div>
 """
 
 
@@ -646,19 +717,38 @@ def format_overseas_case_list_by_hs(results, hs_code):
         case = item['case']
         country = item['country']
         flag = "🇺🇸" if country == "US" else "🇪🇺"
+        card_class = "us" if country == "US" else "eu"
 
         reply = case.get('reply', 'N/A')
         reply_short = reply[:80] + "..." if len(reply) > 80 else reply
+        # 요약에도 하이라이트 적용
+        reply_short = highlight_keywords(reply_short, hs_code)
+
         ref_id = case.get('reference_id', 'N/A')
         hs_code_display = case.get('hs_code', 'N/A')
 
-        # Expander 제목
-        output += f"<details><summary><b>{idx}위 {flag}. {ref_id}</b> | HS {hs_code_display} | {reply_short}</summary>\n\n"
+        # 카드형 Expander
+        output += f"""<div class="case-card {card_class}">
+<details>
+<summary class="case-summary">
+<span class="arrow">▶</span>
+<span class="rank">{idx}위 {flag}</span>
+<span class="ref-id">{ref_id}</span>
+<span class="hs-code">HS {hs_code_display}</span>
+<span class="reply-preview">{reply_short}</span>
+</summary>
 
-        # Expander 내용 (전체 상세 정보)
-        output += format_overseas_case_detail(case, country)
+<div class="case-content">
+"""
 
-        output += "\n</details>\n\n"
+        # Expander 내용 (전체 상세 정보, 하이라이트 적용)
+        output += format_overseas_case_detail(case, country, query=hs_code)
+
+        output += """</div>
+</details>
+</div>
+
+"""
 
     output += "\n💡 **각 항목을 클릭하면 상세 정보를 확인할 수 있습니다.**"
     return output
@@ -674,32 +764,68 @@ def format_overseas_case_list(us_results, eu_results, query):
         for idx, case in enumerate(us_results, 1):
             reply = case.get('reply', 'N/A')
             reply_short = reply[:60] + "..." if len(reply) > 60 else reply
+            # 요약에도 하이라이트 적용
+            reply_short = highlight_keywords(reply_short, query)
+
             ref_id = case.get('reference_id', 'N/A')
             hs_code = case.get('hs_code', 'N/A')
 
-            # Expander 제목
-            output += f"<details><summary><b>{idx}위. {ref_id}</b> | HS {hs_code} | {reply_short}</summary>\n\n"
+            # 카드형 Expander
+            output += f"""<div class="case-card us">
+<details>
+<summary class="case-summary">
+<span class="arrow">▶</span>
+<span class="rank">{idx}위</span>
+<span class="ref-id">{ref_id}</span>
+<span class="hs-code">HS {hs_code}</span>
+<span class="reply-preview">{reply_short}</span>
+</summary>
 
-            # Expander 내용
-            output += format_overseas_case_detail(case, 'US')
+<div class="case-content">
+"""
 
-            output += "\n</details>\n\n"
+            # Expander 내용 (하이라이트 적용)
+            output += format_overseas_case_detail(case, 'US', query=query)
+
+            output += """</div>
+</details>
+</div>
+
+"""
 
     if eu_results:
         output += f"\n---\n\n### 🇪🇺 EU ({len(eu_results)}건)\n\n"
         for idx, case in enumerate(eu_results, 1):
             reply = case.get('reply', 'N/A')
             reply_short = reply[:60] + "..." if len(reply) > 60 else reply
+            # 요약에도 하이라이트 적용
+            reply_short = highlight_keywords(reply_short, query)
+
             ref_id = case.get('reference_id', 'N/A')
             hs_code = case.get('hs_code', 'N/A')
 
-            # Expander 제목
-            output += f"<details><summary><b>{idx}위. {ref_id}</b> | HS {hs_code} | {reply_short}</summary>\n\n"
+            # 카드형 Expander
+            output += f"""<div class="case-card eu">
+<details>
+<summary class="case-summary">
+<span class="arrow">▶</span>
+<span class="rank">{idx}위</span>
+<span class="ref-id">{ref_id}</span>
+<span class="hs-code">HS {hs_code}</span>
+<span class="reply-preview">{reply_short}</span>
+</summary>
 
-            # Expander 내용
-            output += format_overseas_case_detail(case, 'EU')
+<div class="case-content">
+"""
 
-            output += "\n</details>\n\n"
+            # Expander 내용 (하이라이트 적용)
+            output += format_overseas_case_detail(case, 'EU', query=query)
+
+            output += """</div>
+</details>
+</div>
+
+"""
 
     output += "\n💡 **각 항목을 클릭하면 상세 정보를 확인할 수 있습니다.**"
     return output

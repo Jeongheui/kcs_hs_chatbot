@@ -6,8 +6,11 @@ from datetime import datetime
 
 import os
 from dotenv import load_dotenv
-from utils import HSDataManager, extract_hs_codes, clean_text, classify_question
+from utils import HSDataManager, extract_hs_codes, clean_text
 from utils import handle_web_search, handle_hs_classification_cases, handle_overseas_hs, get_hs_explanations, handle_hs_manual_with_user_codes
+from utils import handle_domestic_case_lookup, handle_overseas_case_lookup
+from prompts import SYSTEM_PROMPT
+from config import CATEGORY_MAPPING, LOGGER_ICONS, EXAMPLE_QUESTIONS
 
 # 환경 변수 로드 (.env 파일에서 API 키 등 설정값 로드)
 load_dotenv()
@@ -46,6 +49,198 @@ st.markdown("""
 .stRadio > div > label > div:first-child {
     margin-right: 8px !important;
 }
+
+/* 키워드 하이라이트 (노란 형광색) */
+mark {
+    background-color: #ffeb3b;
+    color: #000;
+    padding: 2px 4px;
+    border-radius: 3px;
+    font-weight: 500;
+}
+
+/* 카드형 검색 결과 레이아웃 */
+.case-card {
+    margin: 12px 0;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    transition: all 0.3s ease;
+    border: 2px solid transparent;
+}
+
+.case-card:hover {
+    box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+    transform: translateY(-2px);
+}
+
+/* 국내/해외 색상 구분 */
+.case-card.domestic {
+    border-left: 5px solid #1976d2;
+    background-color: #f5f9ff;
+}
+
+.case-card.us {
+    border-left: 5px solid #d32f2f;
+    background-color: #fff5f5;
+}
+
+.case-card.eu {
+    border-left: 5px solid #1565c0;
+    background-color: #f0f7ff;
+}
+
+/* Expander 제목 스타일 */
+.case-summary {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 20px;
+    cursor: pointer;
+    background-color: white;
+    font-size: 15px;
+    font-weight: 500;
+    transition: background-color 0.2s;
+    list-style: none;
+}
+
+.case-summary::-webkit-details-marker {
+    display: none;
+}
+
+.case-summary:hover {
+    background-color: #fafafa;
+}
+
+details[open] .case-summary {
+    border-bottom: 1px solid #e0e0e0;
+    background-color: #f8f8f8;
+}
+
+/* 화살표 아이콘 */
+.arrow {
+    font-size: 14px;
+    color: #666;
+    transition: transform 0.3s;
+    min-width: 16px;
+}
+
+details[open] .arrow {
+    transform: rotate(90deg);
+}
+
+/* 순위 배지 */
+.rank {
+    background-color: #ff9800;
+    color: white;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 13px;
+    font-weight: 600;
+    min-width: 40px;
+    text-align: center;
+}
+
+/* 참고문서번호 */
+.ref-id {
+    color: #1976d2;
+    font-weight: 600;
+    font-size: 14px;
+    min-width: 140px;
+}
+
+/* HS 코드 */
+.hs-code {
+    background-color: #e3f2fd;
+    color: #1565c0;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+/* 품목명/요약 미리보기 */
+.product-name, .reply-preview {
+    flex: 1;
+    color: #424242;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* 날짜 */
+.date {
+    color: #757575;
+    font-size: 13px;
+    white-space: nowrap;
+}
+
+/* Expander 내용 영역 */
+.case-content {
+    padding: 20px;
+    background-color: #fafafa;
+    line-height: 1.7;
+}
+
+/* 상세 정보 테이블 */
+.info-table table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+    background-color: white;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.info-table th, .info-table td {
+    padding: 12px 16px;
+    text-align: left;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.info-table th {
+    background-color: #f5f5f5;
+    font-weight: 600;
+    color: #424242;
+    width: 30%;
+}
+
+.info-table tr:last-child td {
+    border-bottom: none;
+}
+
+/* 상세 정보 섹션 */
+.case-detail h3 {
+    color: #1976d2;
+    margin-top: 20px;
+    margin-bottom: 12px;
+    font-size: 18px;
+}
+
+.case-detail h2 {
+    color: #1565c0;
+    margin-bottom: 16px;
+}
+
+/* 반응형 디자인 */
+@media (max-width: 768px) {
+    .case-summary {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+        padding: 12px 16px;
+    }
+
+    .rank, .ref-id, .hs-code {
+        min-width: auto;
+    }
+
+    .product-name, .reply-preview {
+        white-space: normal;
+    }
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -65,27 +260,11 @@ if 'chat_history' not in st.session_state:
     st.session_state.chat_history = []  # 채팅 기록 저장
 
 if 'selected_category' not in st.session_state:
-    st.session_state.selected_category = "AI 자동분류"  # 기본값
+    st.session_state.selected_category = "국내 분류사례 기반 HS 추천"  # 기본값
 
 if 'context' not in st.session_state:
     # 초기 컨텍스트 설정
-    st.session_state.context = """당신은 HS 품목분류 전문가로서 관세청에서 오랜 경력을 가진 전문가입니다. 사용자가 물어보는 품목에 대해 아래 네 가지 유형 중 하나로 질문을 분류하여 답변해주세요.
-
-질문 유형:
-1. 웹 검색(Web Search): 물품개요, 용도, 기술개발, 무역동향 등 일반 정보 탐색이 필요한 경우.
-2. HS 분류 검색(HS Classification Search): HS 코드, 품목분류, 관세, 세율 등 HS 코드 관련 정보가 필요한 경우.
-3. HS 해설서 분석(HS Manual Analysis): HS 해설서 본문 심층 분석이 필요한 경우.
-4. 해외 HS 분류(Overseas HS Classification): 해외(미국/EU) HS 분류 사례가 필요한 경우.
-
-중요 지침:
-1. 사용자가 질문하는 물품에 대해 관련어, 유사품목, 대체품목도 함께 고려하여 가장 적합한 HS 코드를 찾아주세요.
-2. 품목의 성분, 용도, 가공상태 등을 고려하여 상세히 설명해주세요.
-3. 사용자가 특정 HS code를 언급하며 질문하는 경우, 답변에 해당 HS code 해설서 분석 내용을 포함하여 답변해주세요.
-4. 관련 규정이나 판례가 있다면 함께 제시해주세요.
-5. 답변은 간결하면서도 전문적으로 제공해주세요.
-
-지금까지의 대화:
-"""
+    st.session_state.context = SYSTEM_PROMPT
 
 if 'ai_analysis_results' not in st.session_state:
     st.session_state.ai_analysis_results = []
@@ -114,8 +293,8 @@ class RealTimeProcessLogger:
     
     def update_display(self):
         log_text = ""
-        icons = {"INFO": "ℹ️", "SUCCESS": "✅", "ERROR": "❌", "DATA": "📊", "AI": "🤖", "SEARCH": "🔍"}
-        
+        icons = LOGGER_ICONS
+
         for log in self.logs[-8:]:
             icon = icons.get(log['level'], "📝")
             data_str = f" | {log['data']}" if log['data'] else ""
@@ -144,33 +323,9 @@ def process_query_with_real_logging(user_input):
         
         category = st.session_state.selected_category
         logger.log_actual("INFO", "Category selected", category)
-        
-        if category == "AI 자동분류":
-            logger.log_actual("AI", "Starting LLM question classification...")
-            start_classify = time.time()
-            q_type = classify_question(user_input)
-            classify_time = time.time() - start_classify
-            logger.log_actual("SUCCESS", "LLM classification completed", f"{q_type} in {classify_time:.2f}s")
-        else:
-            category_mapping = {
-                "웹 검색": "web_search",
-                "국내 HS분류사례 검색": "hs_classification",
-                "해외 HS분류사례 검색": "overseas_hs",
-                "HS해설서 분석(품명 + 후보 HS코드)": "hs_manual",
-                "HS해설서 원문 검색(HS코드만 입력)": "hs_manual_raw",
-                "AI 자동분류": "auto"  # AI 자동분류는 자동 판별로 처리
-            }
-            q_type = category_mapping.get(category, "hs_classification")
 
-            # AI 자동분류가 수동 선택된 경우 자동 판별 실행
-            if q_type == "auto":
-                logger.log_actual("AI", "Starting LLM question classification (manual selection)...")
-                start_classify = time.time()
-                q_type = classify_question(user_input)
-                classify_time = time.time() - start_classify
-                logger.log_actual("SUCCESS", "LLM classification completed", f"{q_type} in {classify_time:.2f}s")
-            else:
-                logger.log_actual("INFO", "Question type mapped", q_type)
+        q_type = CATEGORY_MAPPING.get(category, "hs_classification")
+        logger.log_actual("INFO", "Question type mapped", q_type)
 
         answer_start = time.time()
         
@@ -180,16 +335,30 @@ def process_query_with_real_logging(user_input):
             answer = "\n\n +++ 웹검색 실시 +++\n\n" + handle_web_search(user_input, st.session_state.context, hs_manager)
             ai_time = time.time() - ai_start
             logger.log_actual("SUCCESS", "Web search completed", f"{ai_time:.2f}s, {len(answer)} chars")
-            
-        elif q_type == "hs_classification":
+
+        elif q_type == "domestic_hs_recommendation":
             # Multi-Agent 분석 실행 (UI 컨테이너 없이)
             final_answer = handle_hs_classification_cases(user_input, st.session_state.context, hs_manager, None)
-            answer = "\n\n +++ HS 분류사례 검색 실시 +++\n\n" + final_answer
-            
-        elif q_type == "overseas_hs":
+            answer = "\n\n +++ 국내 분류사례 기반 HS 추천 +++\n\n" + final_answer
+
+        elif q_type == "domestic_case_lookup":
+            logger.log_actual("SEARCH", "Domestic case lookup starting...")
+            lookup_start = time.time()
+            answer = "\n\n +++ 국내 분류사례 원문 검색 +++\n\n" + handle_domestic_case_lookup(user_input, hs_manager)
+            lookup_time = time.time() - lookup_start
+            logger.log_actual("SUCCESS", "Domestic case lookup completed", f"{lookup_time:.2f}s, {len(answer)} chars")
+
+        elif q_type == "overseas_hs_recommendation":
             # Multi-Agent 분석 실행 (UI 컨테이너 없이)
             final_answer = handle_overseas_hs(user_input, st.session_state.context, hs_manager, None)
-            answer = "\n\n +++ 해외 HS 분류 검색 실시 +++\n\n" + final_answer
+            answer = "\n\n +++ 해외 분류사례 기반 HS 추천 +++\n\n" + final_answer
+
+        elif q_type == "overseas_case_lookup":
+            logger.log_actual("SEARCH", "Overseas case lookup starting...")
+            lookup_start = time.time()
+            answer = "\n\n +++ 해외 분류사례 원문 검색 +++\n\n" + handle_overseas_case_lookup(user_input, hs_manager)
+            lookup_time = time.time() - lookup_start
+            logger.log_actual("SUCCESS", "Overseas case lookup completed", f"{lookup_time:.2f}s, {len(answer)} chars")
             
         elif q_type == "hs_manual":
             # 1단계: HS코드 추출 시도
@@ -308,23 +477,7 @@ with st.sidebar:
         if 'hs_manual_analysis_results' in st.session_state:
             st.session_state.hs_manual_analysis_results = []
         # 컨텍스트 초기화 (기본 컨텍스트 재사용)
-        st.session_state.context = """당신은 HS 품목분류 전문가로서 관세청에서 오랜 경력을 가진 전문가입니다. 사용자가 물어보는 품목에 대해 아래 네 가지 유형 중 하나로 질문을 분류하여 답변해주세요.
-
-질문 유형:
-1. 웹 검색(Web Search): 물품개요, 용도, 기술개발, 무역동향 등 일반 정보 탐색이 필요한 경우.
-2. HS 분류 검색(HS Classification Search): HS 코드, 품목분류, 관세, 세율 등 HS 코드 관련 정보가 필요한 경우.
-3. HS 해설서 분석(HS Manual Analysis): HS 해설서 본문 심층 분석이 필요한 경우.
-4. 해외 HS 분류(Overseas HS Classification): 해외(미국/EU) HS 분류 사례가 필요한 경우.
-
-중요 지침:
-1. 사용자가 질문하는 물품에 대해 관련어, 유사품목, 대체품목도 함께 고려하여 가장 적합한 HS 코드를 찾아주세요.
-2. 품목의 성분, 용도, 가공상태 등을 고려하여 상세히 설명해주세요.
-3. 사용자가 특정 HS code를 언급하며 질문하는 경우, 답변에 해당 HS code 해설서 분석 내용을 포함하여 답변해주세요.
-4. 관련 규정이나 판례가 있다면 함께 제시해주세요.
-5. 답변은 간결하면서도 전문적으로 제공해주세요.
-
-지금까지의 대화:
-"""
+        st.session_state.context = SYSTEM_PROMPT
         st.success("✅ 새로운 채팅이 시작되었습니다!")
 
 # 메인 페이지 설정
@@ -360,11 +513,12 @@ selected_category = st.radio(
     "분석 방식을 선택하세요:",
     [
         "웹 검색",
-        "국내 HS분류사례 검색",
-        "해외 HS분류사례 검색",
+        "국내 분류사례 기반 HS 추천",
+        "국내 분류사례 원문 검색",
+        "해외 분류사례 기반 HS 추천",
+        "해외 분류사례 원문 검색",
         "HS해설서 분석(품명 + 후보 HS코드)",
-        "HS해설서 원문 검색(HS코드만 입력)",
-        "AI 자동분류"
+        "HS해설서 원문 검색(HS코드만 입력)"
     ],
     index=0,
     horizontal=True,
@@ -436,42 +590,8 @@ input_container = st.container()
 st.markdown("<div style='flex: 1;'></div>", unsafe_allow_html=True)
 
 with input_container:
-    # 선택된 유형에 따른 예시 질문 3개씩 (실제 데이터 기반)
-    example_questions = {
-        "웹 검색": [
-            "전기차 배터리 최신 기술 개발 현황은?",
-            "반도체 시장 동향과 주요 수출국은?",
-            "수소연료전지의 글로벌 시장 전망은?"
-        ],
-        "국내 HS분류사례 검색": [
-            "섬유유연제의 HS코드는?",
-            "폴리아미드로 만든 자동차 브레이크 호스는 어떻게 분류되나요?",
-            "알루미늄 드릴 홀더 어댑터의 HS코드를 알려주세요"
-        ],
-        "해외 HS분류사례 검색": [
-            "미국에서 파티 장식용품은 어떻게 분류하나요?",
-            "EU의 플라스틱 백 분류 기준은?",
-            "의료기기의 해외 분류 사례를 알려주세요"
-        ],
-        "HS해설서 분석(품명 + 후보 HS코드)": [
-            "3809.91과 5603 중 섬유유연제 시트는?",
-            "3917.32와 4009 중 폴리아미드 호스는?",
-            "7616.99와 8466 중 알루미늄 어댑터는?"
-        ],
-        "HS해설서 원문 검색(HS코드만 입력)": [
-            "3809",
-            "3917",
-            "9027"
-        ],
-        "AI 자동분류": [
-            "섬유유연제 시트는 어떻게 분류되나요?",
-            "자동차 브레이크용 관의 HS코드는?",
-            "분석기기용 큐벳의 분류 사례를 알려주세요"
-        ]
-    }
-
     # 선택된 카테고리의 예시 질문들 (텍스트로만 표시)
-    examples = example_questions.get(st.session_state.selected_category, [])
+    examples = EXAMPLE_QUESTIONS.get(st.session_state.selected_category, [])
 
     if examples:
         st.markdown("**💡 예시 질문:**")
@@ -500,8 +620,8 @@ with input_container:
             hs_manager = get_hs_manager()
             
             # 분석 과정 표시가 필요한 유형들
-            if selected_category in ["국내 HS분류사례 검색", "해외 HS분류사례 검색", "HS해설서 분석(품명 + 후보 HS코드)"]:
-                if selected_category in ["국내 HS분류사례 검색", "해외 HS분류사례 검색"]:
+            if selected_category in ["국내 분류사례 기반 HS 추천", "해외 분류사례 기반 HS 추천", "HS해설서 분석(품명 + 후보 HS코드)"]:
+                if selected_category in ["국내 분류사례 기반 HS 추천", "해외 분류사례 기반 HS 추천"]:
                     st.session_state.ai_analysis_results = []  # Multi-Agent용 결과 초기화
                 analysis_expander = st.expander("🔍 **AI 분석 과정 보기**", expanded=True)
 
@@ -523,19 +643,19 @@ with input_container:
                     else:
                         # HS코드가 없으면 에러 메시지
                         answer = "해설서 분석 모드에서는 반드시 HS 코드를 제시해야 합니다.\n\n예시: '3923.30과 3926.90 중 어느 것이 맞나요?'"
-                elif selected_category not in ["국내 HS분류사례 검색", "해외 HS분류사례 검색"]:
+                elif selected_category not in ["국내 분류사례 기반 HS 추천", "해외 분류사례 기반 HS 추천"]:
                     # 기타 유형은 로그 패널 표시
                     with st.expander("실시간 처리 과정 로그 보기", expanded=True):
                         answer = process_query_with_real_logging(user_input)
                 else:
                     # Multi-Agent 분석용 특별 처리
-                    if selected_category == "국내 HS분류사례 검색":
+                    if selected_category == "국내 분류사례 기반 HS 추천":
                         # utils 함수를 직접 호출하되 expander 컨테이너 전달
                         final_answer = handle_hs_classification_cases(user_input, st.session_state.context, hs_manager, analysis_expander)
-                        answer = "\n\n +++ HS 분류사례 검색 실시 +++\n\n" + final_answer
-                    elif selected_category == "해외 HS분류사례 검색":
+                        answer = "\n\n +++ 국내 분류사례 기반 HS 추천 +++\n\n" + final_answer
+                    elif selected_category == "해외 분류사례 기반 HS 추천":
                         final_answer = handle_overseas_hs(user_input, st.session_state.context, hs_manager, analysis_expander)
-                        answer = "\n\n +++ 해외 HS 분류 검색 실시 +++\n\n" + final_answer
+                        answer = "\n\n +++ 해외 분류사례 기반 HS 추천 +++\n\n" + final_answer
 
                 # Update chat history after successful processing
                 st.session_state.chat_history.append({"role": "user", "content": user_input})
@@ -543,7 +663,7 @@ with input_container:
                 st.session_state.context += f"\n사용자: {user_input}\n품목분류 전문가: {answer}\n"
 
                 # 분석 과정이 표시된 유형들의 최종 답변 표시 (마크다운으로 렌더링)
-                if selected_category in ["국내 HS분류사례 검색", "해외 HS분류사례 검색", "HS해설서 분석(품명 + 후보 HS코드)"]:
+                if selected_category in ["국내 분류사례 기반 HS 추천", "해외 분류사례 기반 HS 추천", "HS해설서 분석(품명 + 후보 HS코드)"]:
                     st.markdown("**품목분류 전문가:**")
                     st.markdown(answer)
                 

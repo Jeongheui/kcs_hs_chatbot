@@ -106,6 +106,21 @@ class HSDataManager:
         # 중복 제거 및 길이 2 이상인 단어만 선택
         return list(set(word for word in words if len(word) >= 2))
 
+    def _tokenize_query(self, query: str) -> List[str]:
+        """
+        검색 쿼리를 토큰으로 분리하는 메서드 (검색 전용)
+
+        Args:
+            query: 검색 쿼리 문자열
+
+        Returns:
+            토큰 리스트 (최소 2글자 이상)
+        """
+        # 특수문자 제거 및 공백 기준 분리
+        tokens = re.sub(r'[^\w\s]', ' ', query).split()
+        # 길이 2 이상인 토큰만 반환 (중복 허용 - 빈도 계산에 사용)
+        return [token.strip() for token in tokens if len(token.strip()) >= 2]
+
     def search(self, query: str, max_results: int = 5) -> List[Dict[str, Any]]:
         """
         쿼리와 관련된 가장 연관성 높은 항목들을 검색하는 메서드
@@ -425,16 +440,30 @@ class HSDataManager:
         results = self.overseas_tfidf.search(query, top_k, min_similarity)
         return [self.overseas_items[idx] for idx, score in results]
 
-    def search_domestic_by_keyword(self, keyword: str, top_k: int = 10) -> List[Dict[str, Any]]:
+    def search_domestic_by_keyword(
+        self,
+        keyword: str,
+        top_k: int = 10,
+        ignore_spaces: bool = False,
+        min_tokens: int = 1
+    ) -> List[Dict[str, Any]]:
         """
-        키워드 기반 단순 문자열 포함 검색 (국내 분류사례)
+        고급 키워드 검색 (국내 분류사례)
+
+        개선 사항:
+        1. 토큰화: 검색어를 공백으로 분리
+        2. OR 검색: 토큰 중 하나라도 매칭
+        3. 띄어쓰기 무시: 공백 제거 후 검색 옵션
+        4. 가중치 적용: 매칭된 토큰 개수로 순위 매김
 
         Args:
-            keyword: 검색할 키워드
+            keyword: 검색할 키워드 (여러 단어 가능)
             top_k: 반환할 최대 결과 개수
+            ignore_spaces: True시 띄어쓰기 무시하고 검색
+            min_tokens: 최소 매칭 토큰 수 (기본 1)
 
         Returns:
-            키워드가 포함된 사례 리스트
+            검색 결과 리스트 (가중치 순으로 정렬)
         """
         domestic_sources = [
             'HS분류사례_part1', 'HS분류사례_part2', 'HS분류사례_part3', 'HS분류사례_part4', 'HS분류사례_part5',
@@ -442,25 +471,50 @@ class HSDataManager:
             'knowledge/HS위원회', 'knowledge/HS협의회'
         ]
 
-        results = []
-        keyword_lower = keyword.lower()
+        # 1. 토큰화
+        tokens = self._tokenize_query(keyword)
+        if not tokens:
+            return []
+
+        tokens_lower = [t.lower() for t in tokens]
+
+        # 결과를 점수와 함께 저장
+        scored_results = []
 
         for source in domestic_sources:
             if source in self.data:
                 for item in self.data[source]:
-                    # 품목명, 설명, 분류근거에서 키워드 검색 (대소문자 구분 없음)
+                    # 품목명, 설명, 분류근거에서 검색
                     searchable_text = ' '.join([
                         str(item.get('product_name', '')),
                         str(item.get('description', '')),
                         str(item.get('decision_reason', ''))
                     ]).lower()
 
-                    if keyword_lower in searchable_text:
-                        results.append(item)
-                        if len(results) >= top_k:
-                            return results
+                    # 띄어쓰기 무시 옵션
+                    if ignore_spaces:
+                        searchable_text_no_space = searchable_text.replace(' ', '')
 
-        return results
+                    # 가중치 계산: 매칭된 토큰 개수 카운트
+                    matched_tokens = 0
+                    for token in tokens_lower:
+                        if ignore_spaces:
+                            token_no_space = token.replace(' ', '')
+                            if token_no_space in searchable_text_no_space:
+                                matched_tokens += 1
+                        else:
+                            if token in searchable_text:
+                                matched_tokens += 1
+
+                    # OR 검색: 최소 토큰 수 이상 매칭되면 포함
+                    if matched_tokens >= min_tokens:
+                        scored_results.append((matched_tokens, item))
+
+        # 점수 기준 내림차순 정렬
+        scored_results.sort(key=lambda x: x[0], reverse=True)
+
+        # 상위 top_k개만 반환 (점수는 제외)
+        return [item for score, item in scored_results[:top_k]]
 
     def find_domestic_case_by_id(self, ref_id: str) -> Dict[str, Any]:
         """
@@ -485,37 +539,75 @@ class HSDataManager:
                         return item
         return None
 
-    def search_overseas_by_keyword(self, keyword: str, top_k: int = 10) -> List[Dict[str, Any]]:
+    def search_overseas_by_keyword(
+        self,
+        keyword: str,
+        top_k: int = 10,
+        ignore_spaces: bool = False,
+        min_tokens: int = 1
+    ) -> List[Dict[str, Any]]:
         """
-        키워드 기반 단순 문자열 포함 검색 (해외 분류사례)
+        고급 키워드 검색 (해외 분류사례)
+
+        개선 사항:
+        1. 토큰화: 검색어를 공백으로 분리
+        2. OR 검색: 토큰 중 하나라도 매칭
+        3. 띄어쓰기 무시: 공백 제거 후 검색 옵션
+        4. 가중치 적용: 매칭된 토큰 개수로 순위 매김
 
         Args:
-            keyword: 검색할 키워드
+            keyword: 검색할 키워드 (여러 단어 가능)
             top_k: 반환할 최대 결과 개수
+            ignore_spaces: True시 띄어쓰기 무시하고 검색
+            min_tokens: 최소 매칭 토큰 수 (기본 1)
 
         Returns:
-            키워드가 포함된 사례 리스트 (국가 정보 포함)
+            검색 결과 리스트 (가중치 순으로 정렬)
         """
-        results = []
-        keyword_lower = keyword.lower()
+        # 1. 토큰화
+        tokens = self._tokenize_query(keyword)
+        if not tokens:
+            return []
+
+        tokens_lower = [t.lower() for t in tokens]
+
+        # 결과를 점수와 함께 저장
+        scored_results = []
 
         for source in ['hs_classification_data_us', 'hs_classification_data_eu']:
             if source in self.data:
-                country = 'US' if 'us' in source else 'EU'
                 for item in self.data[source]:
-                    # 품목명, 설명, 분류근거에서 키워드 검색 (대소문자 구분 없음)
+                    # 품목명, 설명, reply에서 검색
                     searchable_text = ' '.join([
                         str(item.get('product_name', '')),
                         str(item.get('description', '')),
                         str(item.get('reply', ''))
                     ]).lower()
 
-                    if keyword_lower in searchable_text:
-                        results.append(item)
-                        if len(results) >= top_k:
-                            return results
+                    # 띄어쓰기 무시 옵션
+                    if ignore_spaces:
+                        searchable_text_no_space = searchable_text.replace(' ', '')
 
-        return results
+                    # 가중치 계산: 매칭된 토큰 개수 카운트
+                    matched_tokens = 0
+                    for token in tokens_lower:
+                        if ignore_spaces:
+                            token_no_space = token.replace(' ', '')
+                            if token_no_space in searchable_text_no_space:
+                                matched_tokens += 1
+                        else:
+                            if token in searchable_text:
+                                matched_tokens += 1
+
+                    # OR 검색: 최소 토큰 수 이상 매칭되면 포함
+                    if matched_tokens >= min_tokens:
+                        scored_results.append((matched_tokens, item))
+
+        # 점수 기준 내림차순 정렬
+        scored_results.sort(key=lambda x: x[0], reverse=True)
+
+        # 상위 top_k개만 반환 (점수는 제외)
+        return [item for score, item in scored_results[:top_k]]
 
     def find_overseas_case_by_id(self, ref_id: str) -> Dict[str, Any]:
         """
