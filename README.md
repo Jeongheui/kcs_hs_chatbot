@@ -195,7 +195,7 @@ LED 조명이 내장된 피규어 하우스 무드등을 수입하려는데, 정
 
 ## 🚀 사용법
 
-### 🔍 1. 웹 검색
+### 1. 🔍 웹 검색
 
 **최신 정보를 실시간으로 검색합니다**
 
@@ -203,7 +203,7 @@ LED 조명이 내장된 피규어 하우스 무드등을 수입하려는데, 정
 - Google Search API를 통한 실시간 정보 검색
 - 예시: "전기차 배터리 최신 기술 개발 현황은?"
 
-### 🇰🇷 2. 국내 분류사례 기반 HS 추천
+### 2. 🇰🇷 국내 분류사례 기반 HS 추천
 
 **AI가 유사 사례를 분석하여 HS 코드를 추천합니다**
 
@@ -222,7 +222,7 @@ LED 조명이 내장된 피규어 하우스 무드등을 수입하려는데, 정
 - "섬유유연제의 HS코드는?"
 - "폴리아미드로 만든 자동차 브레이크 호스는 어떻게 분류되나요?"
 
-### 📋 3. 국내 분류사례 원문 검색
+### 3. 📋 국내 분류사례 원문 검색
 
 **키워드로 정확한 분류사례 원문을 찾습니다**
 
@@ -257,9 +257,9 @@ LED 조명이 내장된 피규어 하우스 무드등을 수입하려는데, 정
 | 속도 | ⚡ 0.5초 이내 | 🤖 5-10초 |
 | 적합한 경우 | 정확한 사례 원문 확인 | HS 코드 추천 및 종합 분석 |
 
-### 🌍 4. 해외 분류사례 기반 HS 추천
+### 4. 🌍 해외 분류사례 기반 HS 추천
 
-**미국🇺🇸 및 EU🇪🇺 사례를 AI가 분석하여 HS 코드를 추천합니다**
+**미국 및 EU 사례를 AI가 분석하여 HS 코드를 추천합니다**
 
 #### ⚙️ 동작 원리
 1. **TF-IDF Character n-gram 검색**: 전체 1,900건에서 상위 100개 유사 사례 추출
@@ -275,9 +275,9 @@ LED 조명이 내장된 피규어 하우스 무드등을 수입하려는데, 정
 - "미국에서 파티 장식용품은 어떻게 분류하나요?"
 - "EU의 플라스틱 백 분류 기준은?"
 
-### 🗂️ 5. 해외 분류사례 원문 검색
+### 5. 🗂️ 해외 분류사례 원문 검색
 
-**미국🇺🇸 CBP 및 EU🇪🇺 관세청 사례를 직접 검색합니다**
+**미국 CBP 및 EU 관세당국 사례를 직접 검색합니다**
 
 #### 🔍 검색 방법
 1. **참고문서번호 검색**
@@ -299,7 +299,7 @@ LED 조명이 내장된 피규어 하우스 무드등을 수입하려는데, 정
   - 참고문서번호, 결정일자, 결정기관, HS 코드, 연도
   - 요약(reply), 상세 내용(description)
 
-### 📚 6. HS 해설서 분석 (사용자 제시 코드)
+### 6. 📚 HS 해설서 분석 (사용자 제시 코드)
 
 **사용자가 제시한 HS 코드들을 비교 분석합니다**
 
@@ -323,7 +323,7 @@ LED 조명이 내장된 피규어 하우스 무드등을 수입하려는데, 정
 - 반드시 HS 코드를 질문에 포함해야 합니다
 - 2개 이상의 HS 코드 비교 권장
 
-### 📖 7. HS 해설서 원문 검색
+### 7. 📖 HS 해설서 원문 검색
 
 **특정 HS 코드의 해설서 원문을 조회합니다**
 
@@ -377,39 +377,62 @@ LED 조명이 내장된 피규어 하우스 무드등을 수입하려는데, 정
 
 ```
 kcs_hs_chatbot/
-├── main.py                 # 메인 프로그램 (실행 파일)
-├── utils/                  # 핵심 기능 모듈
-│   ├── __init__.py         # 모듈 통합 및 export
-│   ├── data_loader.py      # HSDataManager 클래스 (TF-IDF 인덱스 구축)
-│   ├── tfidf_search.py     # Character n-gram TF-IDF 검색 엔진
-│   ├── handlers.py         # 질문 유형별 처리 함수 (Multi-Agent, 원문 검색)
-│   ├── hs_manual_utils.py  # HS 해설서 관련 함수들
-│   ├── search_engines.py   # 병렬 검색 엔진 (관세율표 + 해설서)
-│   ├── keyword_searcher.py # 키워드 기반 원문 검색 엔진
-│   └── text_utils.py       # 텍스트 처리 유틸리티
-├── hs_search.py            # HS 코드 검색 유틸리티
-├── CLAUDE.md              # Claude Code 개발 가이드
-├── .env                    # 환경 변수 (API 키)
-├── requirements.txt        # 패키지 의존성
-├── README.md              # 프로젝트 문서
-└── knowledge/             # 핵심 데이터 파일
-    ├── HS분류사례_part1.json ~ part10.json  # 국내 분류사례
-    ├── HS위원회.json, HS협의회.json          # 위원회 결정사항
-    ├── hs_classification_data_us.json       # 미국 관세청 데이터
-    ├── hs_classification_data_eu.json       # EU 관세청 데이터
-    ├── hstable.json                         # 관세율표
-    ├── 통칙_grouped.json                     # HS 통칙
-    └── grouped_11_end.json                  # HS 해설서
+├── main.py                      # Streamlit 웹 애플리케이션 (프로그램 실행 파일)
+├── prompts.py                   # AI 시스템 프롬프트 관리
+├── config.py                    # 설정 파일 (카테고리, 예시 질문 등)
+├── build_tfidf_index.py         # TF-IDF 인덱스 생성 스크립트
+├── tfidf_indexes.pkl.gz         # 사전 생성된 TF-IDF 인덱스 (캐시 파일)
+├── hs_search.py                 # HS 코드 검색 유틸리티
+├── utils/                       # 핵심 기능 모듈
+│   ├── __init__.py              # 모듈 통합 및 export
+│   ├── data_loader.py           # HSDataManager 클래스 (데이터 로딩)
+│   ├── tfidf_search.py          # Character n-gram TF-IDF 검색 엔진
+│   ├── tfidf_case_searcher.py   # TF-IDF 기반 사례 검색
+│   ├── keyword_searcher.py      # 키워드 기반 원문 검색 엔진
+│   ├── question_classifier.py   # 질문 유형 자동 분류
+│   ├── handlers.py              # 질문 유형별 처리 함수 (Multi-Agent, 원문 검색)
+│   ├── hs_manual_utils.py       # HS 해설서 관련 함수들
+│   ├── search_engines.py        # 병렬 검색 엔진 (관세율표 + 해설서)
+│   └── text_utils.py            # 텍스트 처리 유틸리티
+├── knowledge/                   # 핵심 데이터 파일
+│   ├── HS분류사례_part1.json ~ part10.json  # 국내 분류사례 (분할)
+│   ├── HS위원회.json                        # HS위원회 결정
+│   ├── HS협의회.json                        # HS협의회 결정
+│   ├── hs_classification_data_us.json       # 미국 CBP 분류사례
+│   ├── hs_classification_data_eu.json       # EU 관세청 BTI
+│   ├── hstable.json                         # HS 품목분류표
+│   ├── 통칙_grouped.json                     # HS 통칙
+│   └── grouped_11_end.json                  # HS 해설서
+├── .env                         # 환경 변수 (API 키) - git에서 제외
+├── requirements.txt             # Python 패키지 의존성
+└── README.md                    # 프로젝트 문서
 ```
 
 ### 📝 핵심 파일 설명
 
-- **`main.py`**: Streamlit 기반 웹 인터페이스 (프로그램 실행 파일)
-- **`utils/handlers.py`**: 7가지 질문 유형별 처리 로직 (Multi-Agent, 원문 검색 등)
-- **`utils/data_loader.py`**: TF-IDF 인덱스 구축 및 데이터 로딩
-- **`utils/tfidf_search.py`**: Character n-gram 기반 TF-IDF 검색 엔진
-- **`utils/keyword_searcher.py`**: 키워드 기반 원문 검색 (참고문서번호, 키워드 매칭)
-- **`knowledge/`**: 품목분류 사례 및 해설서 데이터 저장 폴더 (JSON 형식)
+#### 🎯 메인 프로그램
+- **`main.py`**: Streamlit 기반 웹 애플리케이션 (프로그램 실행 파일)
+- **`prompts.py`**: AI 시스템 프롬프트 및 대화 템플릿 관리
+- **`config.py`**: 카테고리 매핑, 로거 아이콘, 예시 질문 등 설정 관리
+
+#### ⚡ 성능 최적화
+- **`build_tfidf_index.py`**: TF-IDF 인덱스 사전 생성 스크립트 (초기 로딩 시간 단축)
+- **`tfidf_indexes.pkl.gz`**: 사전 생성된 TF-IDF 인덱스 캐시 파일
+
+#### 🔧 핵심 유틸리티 모듈 (utils/)
+- **`data_loader.py`**: HSDataManager 클래스 (데이터 로딩 및 관리)
+- **`tfidf_search.py`**: Character n-gram 기반 TF-IDF 검색 엔진
+- **`tfidf_case_searcher.py`**: TF-IDF 기반 품목분류 사례 검색
+- **`keyword_searcher.py`**: 키워드 기반 원문 검색 (참고문서번호, 키워드 매칭)
+- **`question_classifier.py`**: 사용자 질문 유형 자동 분류
+- **`handlers.py`**: 7가지 질문 유형별 처리 로직 (Multi-Agent, 원문 검색 등)
+- **`hs_manual_utils.py`**: HS 해설서 검색 및 처리 함수
+- **`search_engines.py`**: 병렬 검색 엔진 (관세율표 + 해설서 동시 검색)
+- **`text_utils.py`**: 텍스트 정제 및 처리 유틸리티
+
+#### 📊 데이터 폴더 (knowledge/)
+- 품목분류 사례 및 해설서 데이터 저장 (JSON 형식)
+- 국내 분류사례, 해외 분류사례, HS 해설서, 통칙 등
 
 ---
 
