@@ -5,7 +5,7 @@
 ---
 
 <details open>
-<summary><b>## 📑 목차</b></summary>
+<summary><b>📑 목차</b></summary>
 
 - [💡 1인1봇 프로젝트](#-1인1봇-프로젝트)
 - [💬 채팅 시나리오](#-채팅-시나리오-led-무드등-수입-업무)
