@@ -300,12 +300,12 @@ class RealTimeProcessLogger:
         self.log_placeholder.empty()
 
 
-def process_query_with_real_logging(user_input):
+def process_query_with_real_logging(user_input, client):
     """실제 진행사항을 기록하면서 쿼리 처리"""
-    
+
     log_container = st.container()
     logger = RealTimeProcessLogger(log_container)
-    
+
     try:
         logger.log_actual("INFO", "Query processing started", f"Input length: {len(user_input)}")
         
@@ -672,7 +672,7 @@ with input_container:
                 elif selected_category not in ["국내 분류사례 기반 HS 추천", "해외 분류사례 기반 HS 추천"]:
                     # 기타 유형은 로그 패널 표시
                     with st.expander("실시간 처리 과정 로그 보기", expanded=True):
-                        answer = process_query_with_real_logging(user_input)
+                        answer = process_query_with_real_logging(user_input, client)
                 else:
                     # Multi-Agent 분석용 특별 처리
                     if selected_category == "국내 분류사례 기반 HS 추천":
