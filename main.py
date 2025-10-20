@@ -332,13 +332,13 @@ def process_query_with_real_logging(user_input):
         if q_type == "web_search":
             logger.log_actual("SEARCH", "Initiating Google Search API call...")
             ai_start = time.time()
-            answer = "\n\n +++ 웹검색 실시 +++\n\n" + handle_web_search(user_input, st.session_state.context, hs_manager)
+            answer = "\n\n +++ 웹검색 실시 +++\n\n" + handle_web_search(user_input, st.session_state.context, hs_manager, client)
             ai_time = time.time() - ai_start
             logger.log_actual("SUCCESS", "Web search completed", f"{ai_time:.2f}s, {len(answer)} chars")
 
         elif q_type == "domestic_hs_recommendation":
             # Multi-Agent 분석 실행 (UI 컨테이너 없이)
-            final_answer = handle_hs_classification_cases(user_input, st.session_state.context, hs_manager, None)
+            final_answer = handle_hs_classification_cases(user_input, st.session_state.context, hs_manager, client, None)
             answer = "\n\n +++ 국내 분류사례 기반 HS 추천 +++\n\n" + final_answer
 
         elif q_type == "domestic_case_lookup":
@@ -350,7 +350,7 @@ def process_query_with_real_logging(user_input):
 
         elif q_type == "overseas_hs_recommendation":
             # Multi-Agent 분석 실행 (UI 컨테이너 없이)
-            final_answer = handle_overseas_hs(user_input, st.session_state.context, hs_manager, None)
+            final_answer = handle_overseas_hs(user_input, st.session_state.context, hs_manager, client, None)
             answer = "\n\n +++ 해외 분류사례 기반 HS 추천 +++\n\n" + final_answer
 
         elif q_type == "overseas_case_lookup":
@@ -371,7 +371,7 @@ def process_query_with_real_logging(user_input):
                 logger.log_actual("SUCCESS", f"Found {len(extracted_codes)} user-provided HS codes", ", ".join(extracted_codes))
                 logger.log_actual("AI", "Starting user-provided codes comparison analysis...")
                 ai_start = time.time()
-                answer = "\n\n +++ HS 해설서 분석 실시 (사용자 제시 코드 비교) +++ \n\n" + handle_hs_manual_with_user_codes(user_input, st.session_state.context, hs_manager, logger, extracted_codes)
+                answer = "\n\n +++ HS 해설서 분석 실시 (사용자 제시 코드 비교) +++ \n\n" + handle_hs_manual_with_user_codes(user_input, st.session_state.context, hs_manager, logger, extracted_codes, client)
                 ai_time = time.time() - ai_start
                 logger.log_actual("SUCCESS", "User-provided codes analysis completed", f"{ai_time:.2f}s, {len(answer)} chars")
             else:
@@ -638,7 +638,7 @@ with input_container:
 
                     if extracted_codes:
                         # HS코드가 있으면 사용자 제시 코드 비교 분석
-                        final_answer = handle_hs_manual_with_user_codes(user_input, st.session_state.context, hs_manager, dummy_logger, extracted_codes, analysis_expander)
+                        final_answer = handle_hs_manual_with_user_codes(user_input, st.session_state.context, hs_manager, dummy_logger, extracted_codes, client, analysis_expander)
                         answer = "\n\n +++ HS 해설서 분석 실시 (사용자 제시 코드 비교) +++ \n\n" + final_answer
                     else:
                         # HS코드가 없으면 에러 메시지
@@ -651,10 +651,10 @@ with input_container:
                     # Multi-Agent 분석용 특별 처리
                     if selected_category == "국내 분류사례 기반 HS 추천":
                         # utils 함수를 직접 호출하되 expander 컨테이너 전달
-                        final_answer = handle_hs_classification_cases(user_input, st.session_state.context, hs_manager, analysis_expander)
+                        final_answer = handle_hs_classification_cases(user_input, st.session_state.context, hs_manager, client, analysis_expander)
                         answer = "\n\n +++ 국내 분류사례 기반 HS 추천 +++\n\n" + final_answer
                     elif selected_category == "해외 분류사례 기반 HS 추천":
-                        final_answer = handle_overseas_hs(user_input, st.session_state.context, hs_manager, analysis_expander)
+                        final_answer = handle_overseas_hs(user_input, st.session_state.context, hs_manager, client, analysis_expander)
                         answer = "\n\n +++ 해외 분류사례 기반 HS 추천 +++\n\n" + final_answer
 
                 # Update chat history after successful processing

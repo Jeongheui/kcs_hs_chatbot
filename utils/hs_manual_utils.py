@@ -6,10 +6,7 @@ from google.genai.errors import APIError
 from dotenv import load_dotenv
 from .text_utils import clean_text, general_explanation
 
-# 환경 변수 로드
-load_dotenv()
-GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
-client = genai.Client(api_key=GOOGLE_API_KEY)
+# API client는 main.py에서 파라미터로 전달받음
 
 def lookup_hscode(hs_code, json_file):
     """HS 코드에 대한 해설 정보를 조회하는 함수"""
@@ -90,7 +87,7 @@ def get_tariff_info_for_codes(hs_codes):
 
     return tariff_info
 
-def get_manual_info_for_codes(hs_codes, logger):
+def get_manual_info_for_codes(hs_codes, logger, client):
     """HS코드들에 대한 해설서 정보 수집 및 요약"""
     manual_info = {}
 
@@ -176,7 +173,7 @@ def prepare_general_rules():
     except Exception as e:
         return "통칙 정보를 로드할 수 없습니다."
 
-def analyze_user_provided_codes(user_input, hs_codes, tariff_info, manual_info, general_rules, context):
+def analyze_user_provided_codes(user_input, hs_codes, tariff_info, manual_info, general_rules, context, client):
     """사용자 제시 HS코드들에 대한 최종 AI 분석"""
 
     # HS 해설서 분석 전용 맞춤형 프롬프트

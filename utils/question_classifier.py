@@ -1,14 +1,5 @@
-import os
-from google import genai
-from dotenv import load_dotenv
-
-# 환경 변수 로드
-load_dotenv()
-GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
-client = genai.Client(api_key=GOOGLE_API_KEY)
-
 # 질문 유형 분류 함수 (LLM 기반)
-def classify_question(user_input):
+def classify_question(user_input, client):
     """
     LLM(Gemini)을 활용하여 사용자의 질문을 아래 네 가지 유형 중 하나로 분류합니다.
     - 'web_search': 물품 개요, 용도, 기술개발, 무역동향, 산업동향 등

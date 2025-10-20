@@ -19,10 +19,7 @@ from .hs_manual_utils import (
 )
 from .search_engines import ParallelHSSearcher
 
-# 환경 변수 로드
-load_dotenv()
-GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
-client = genai.Client(api_key=GOOGLE_API_KEY)
+# API client는 main.py에서 파라미터로 전달받음
 
 # prompts.py에서 프롬프트 import
 from prompts import DOMESTIC_CONTEXT, OVERSEAS_CONTEXT
@@ -59,7 +56,7 @@ def highlight_keywords(text, keywords):
 
 # ==================== Multi-Agent 공통 로직 ====================
 
-def _process_single_group(group_id, group_cases, context_prompt, user_input, analysis_type):
+def _process_single_group(group_id, group_cases, context_prompt, user_input, analysis_type, client):
     """단일 그룹 처리 함수 (병렬 실행용)"""
     try:
         # 그룹 데이터를 컨텍스트로 변환
@@ -86,7 +83,7 @@ def _process_single_group(group_id, group_cases, context_prompt, user_input, ana
         return group_id, error_msg, datetime.now(), 0.0
 
 
-def _run_group_parallel_analysis(groups, context_prompt, user_input, analysis_type, ui_container=None):
+def _run_group_parallel_analysis(groups, context_prompt, user_input, analysis_type, client, ui_container=None):
     """5개 그룹을 병렬로 분석하는 공통 함수"""
 
     # UI 초기화
@@ -98,7 +95,7 @@ def _run_group_parallel_analysis(groups, context_prompt, user_input, analysis_ty
     results = {}
     with ThreadPoolExecutor(max_workers=3) as executor:
         futures = [
-            executor.submit(_process_single_group, i, groups[i], context_prompt, user_input, analysis_type)
+            executor.submit(_process_single_group, i, groups[i], context_prompt, user_input, analysis_type, client)
             for i in range(5)
         ]
 
@@ -134,7 +131,7 @@ def _run_group_parallel_analysis(groups, context_prompt, user_input, analysis_ty
     return group_answers
 
 
-def _run_head_agent(group_answers, context_prompt, user_input, analysis_type, ui_container=None):
+def _run_head_agent(group_answers, context_prompt, user_input, analysis_type, client, ui_container=None):
     """Head Agent가 5개 답변을 종합하는 함수"""
 
     if ui_container:
@@ -169,7 +166,7 @@ def _run_head_agent(group_answers, context_prompt, user_input, analysis_type, ui
 
 # ==================== 통합 Multi-Agent 핸들러 ====================
 
-def handle_multi_agent_analysis(user_input, context, hs_manager, analysis_type, ui_container=None):
+def handle_multi_agent_analysis(user_input, context, hs_manager, analysis_type, client, ui_container=None):
     """
     통합 Multi-Agent 분석 핸들러
 
@@ -178,6 +175,7 @@ def handle_multi_agent_analysis(user_input, context, hs_manager, analysis_type, 
         context: 대화 컨텍스트 (현재 미사용)
         hs_manager: HS 데이터 매니저
         analysis_type: 'domestic' 또는 'overseas'
+        client: Google Gemini API client
         ui_container: Streamlit UI 컨테이너 (optional)
 
     Returns:
@@ -209,29 +207,29 @@ def handle_multi_agent_analysis(user_input, context, hs_manager, analysis_type, 
     groups = [top_cases[i*group_size:(i+1)*group_size if i < 4 else len(top_cases)] for i in range(5)]
 
     # 5개 그룹 병렬 분석
-    group_answers = _run_group_parallel_analysis(groups, context_prompt, user_input, analysis_type, ui_container)
+    group_answers = _run_group_parallel_analysis(groups, context_prompt, user_input, analysis_type, client, ui_container)
 
     # Head Agent 최종 종합
-    final_answer = _run_head_agent(group_answers, context_prompt, user_input, analysis_type, ui_container)
+    final_answer = _run_head_agent(group_answers, context_prompt, user_input, analysis_type, client, ui_container)
 
     return final_answer
 
 
 # ==================== 기존 인터페이스 유지 (래퍼 함수) ====================
 
-def handle_hs_classification_cases(user_input, context, hs_manager, ui_container=None):
+def handle_hs_classification_cases(user_input, context, hs_manager, client, ui_container=None):
     """국내 HS 분류 사례 처리 (래퍼 함수)"""
-    return handle_multi_agent_analysis(user_input, context, hs_manager, 'domestic', ui_container)
+    return handle_multi_agent_analysis(user_input, context, hs_manager, 'domestic', client, ui_container)
 
 
-def handle_overseas_hs(user_input, context, hs_manager, ui_container=None):
+def handle_overseas_hs(user_input, context, hs_manager, client, ui_container=None):
     """해외 HS 분류 사례 처리 (래퍼 함수)"""
-    return handle_multi_agent_analysis(user_input, context, hs_manager, 'overseas', ui_container)
+    return handle_multi_agent_analysis(user_input, context, hs_manager, 'overseas', client, ui_container)
 
 
 # ==================== 기타 핸들러 함수 ====================
 
-def handle_web_search(user_input, context, hs_manager):
+def handle_web_search(user_input, context, hs_manager, client):
     """웹 검색 처리 함수"""
     web_context = """당신은 HS 품목분류 전문가입니다.
 
@@ -251,7 +249,7 @@ def handle_web_search(user_input, context, hs_manager):
     return clean_text(response.text)
 
 
-def handle_hs_manual_with_user_codes(user_input, context, hs_manager, logger, extracted_codes, ui_container=None):
+def handle_hs_manual_with_user_codes(user_input, context, hs_manager, logger, extracted_codes, client, ui_container=None):
     """사용자 제시 HS코드 기반 해설서 분석"""
 
     # UI 컨테이너가 제공된 경우 분석 과정 표시
@@ -277,7 +275,7 @@ def handle_hs_manual_with_user_codes(user_input, context, hs_manager, logger, ex
 
     # 3단계: 각 HS코드별 해설서 정보 수집 및 요약
     logger.log_actual("INFO", "Collecting and summarizing manual information...")
-    manual_info = get_manual_info_for_codes(extracted_codes, logger)
+    manual_info = get_manual_info_for_codes(extracted_codes, logger, client)
 
     if ui_container:
         progress_bar.progress(0.6, text="해설서 정보 수집 및 요약 중...")
@@ -312,7 +310,7 @@ def handle_hs_manual_with_user_codes(user_input, context, hs_manager, logger, ex
 
     # 5단계: 최종 AI 분석
     logger.log_actual("AI", "Starting final AI analysis...")
-    final_answer = analyze_user_provided_codes(user_input, extracted_codes, tariff_info, manual_info, general_rules, context)
+    final_answer = analyze_user_provided_codes(user_input, extracted_codes, tariff_info, manual_info, general_rules, context, client)
 
     if ui_container:
         progress_bar.progress(1.0, text="분석 완료!")
