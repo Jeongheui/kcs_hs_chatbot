@@ -12,17 +12,10 @@ from utils import handle_domestic_case_lookup, handle_overseas_case_lookup
 from prompts import SYSTEM_PROMPT
 from config import CATEGORY_MAPPING, LOGGER_ICONS, EXAMPLE_QUESTIONS
 
-# 환경 변수 로드 (.env 파일에서 API 키 등 설정값 로드)
-load_dotenv()
-
-# Gemini API 설정
-GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
-client = genai.Client(api_key=GOOGLE_API_KEY)
-
 # Streamlit 페이지 설정
 st.set_page_config(
-    page_title="HS 품목분류 챗봇",  # 브라우저 탭 제목
-    page_icon="📊",  # 브라우저 탭 아이콘
+    page_title="HS 품목분류 챗봇 (API Key 입력)",  # 브라우저 탭 제목
+    page_icon="🔑",  # 브라우저 탭 아이콘
     layout="wide"  # 페이지 레이아웃을 넓게 설정
 )
 
@@ -315,12 +308,12 @@ def process_query_with_real_logging(user_input, client):
 
     try:
         logger.log_actual("INFO", "Query processing started", f"Input length: {len(user_input)}")
-
+        
         start_time = time.time()
         hs_manager = get_hs_manager()
         load_time = time.time() - start_time
         logger.log_actual("SUCCESS", "HSDataManager loaded", f"{load_time:.2f}s")
-
+        
         category = st.session_state.selected_category
         logger.log_actual("INFO", "Category selected", category)
 
@@ -411,6 +404,39 @@ def process_query_with_real_logging(user_input, client):
 
 # 사이드바 설정 - 챗봇 특성 소개
 with st.sidebar:
+    st.title("🔑 API Key 설정")
+
+    # Google API Key 입력
+    user_api_key = st.text_input(
+        "Google API Key를 입력하세요",
+        type="password",
+        help="Google AI Studio에서 발급받은 API Key를 입력하세요",
+        key="google_api_key_input"
+    )
+
+    if user_api_key:
+        try:
+            # 사용자 입력으로 client 생성
+            client = genai.Client(api_key=user_api_key)
+            st.success("✅ API Key 인증 성공")
+        except Exception as e:
+            st.error(f"❌ API Key 오류: {str(e)}")
+            st.info("올바른 API Key를 입력해주세요")
+            st.stop()
+    else:
+        st.warning("⚠️ API Key를 입력하세요")
+        st.markdown("""
+        **Google API Key 발급 방법:**
+        1. [Google AI Studio](https://aistudio.google.com/apikey) 접속
+        2. "Create API Key" 클릭
+        3. 발급된 키를 복사하여 위에 입력
+
+        **참고:** 무료 tier에서도 충분히 사용 가능합니다.
+        """)
+        st.stop()
+
+    st.divider()
+
     st.title("📊 HS 품목분류 전문 AI")
 
     st.markdown("---")
@@ -481,7 +507,7 @@ with st.sidebar:
         st.success("✅ 새로운 채팅이 시작되었습니다!")
 
 # 메인 페이지 설정
-st.title("HS 품목분류 챗봇")
+st.title("HS 품목분류 챗봇 (API Key 입력 버전)")
 
 # 활용 시나리오를 접을 수 있는 expander로 변경
 with st.expander("💡 슬기로운 품목분류 생활 (활용 시나리오)", expanded=True):
