@@ -488,20 +488,20 @@ with st.expander("💡 슬기로운 품목분류 생활 (활용 시나리오)", 
     st.markdown("""
     <ol style='padding-left: 18px;'>
       <li style='margin-bottom: 10px;'>
-        <b>[웹 검색] </span> "스마트워치 실리콘 밴드의 정확한 재질 성분과 제조 공정, 주요 용도는 무엇인가?"</b><br>
-        <span style='color:#059669;'>✓ 답변: 합성고무(실리콘), 스마트워치 전용 부속품 확인</span>
+        <b>[웹 검색] </span> "고무 밑창과 가죽 갑피로 만든 등산화의 재질 구성과 주요 용도는?"</b><br>
+        <span style='color:#059669;'>✓ 답변: 고무제 바닥창, 천연가죽 갑피, 신발류 확인</span>
       </li>
       <li style='margin-bottom: 10px;'>
-        <b>[국내 사례] </span> "실리콘 재질로 만든 스마트워치용 교체 밴드는 어떤 HS코드로 분류되나요?"</b><br>
-        <span style='color:#059669;'>✓ 답변: 9113.90 (시계 부속품) 12건 / 3926.90 (플라스틱) 5건</span>
+        <b>[국내 사례] </span> "고무 밑창과 가죽 갑피로 만든 신발(footwear)은 어떤 HS코드로 분류되나요?"</b><br>
+        <span style='color:#059669;'>✓ 답변: 6403.99 (가죽 갑피 신발) 34건</span>
       </li>
       <li style='margin-bottom: 10px;'>
-        <b>[해외 사례] </span> "미국과 EU에서 스마트워치 실리콘 스트랩(watch strap)의 분류 사례와 관세율을 알려줘"</b><br>
-        <span style='color:#059669;'>✓ 답변: 전 세계 동일: 9113.90 분류</span>
+        <b>[해외 사례] </span> "미국에서 footwear with rubber sole and leather upper의 분류 사례를 알려주세요"</b><br>
+        <span style='color:#059669;'>✓ 답변: 미국도 동일하게 6403.99 분류, 48건 사례</span>
       </li>
       <li>
-        <b>[해설서 분석] </span> "스마트워치 전용 실리콘 밴드가 9113.90 시계 부속품과 3926.90 기타 플라스틱 제품 중 어디에 분류되는지 해설서와 통칙을 근거로 비교 분석해줘"</b><br>
-        <span style='color:#059669;'>✓ 결론: 9113.90-0000 (통칙 1, 구체성 원칙)</span>
+        <b>[해설서 분석] </span> "고무 밑창 가죽 갑피 신발이 6403.99 가죽신발과 6402.99 고무신발 중 어디에 분류되는지 해설서와 통칙을 근거로 비교 분석해줘"</b><br>
+        <span style='color:#059669;'>✓ 결론: 6403.99 (통칙 1, 갑피 재질 우선)</span>
       </li>
     </ol>
     """, unsafe_allow_html=True)
@@ -558,7 +558,41 @@ for message in st.session_state.chat_history:
                     5. 🧠 최종 AI 비교 분석 (Gemini 2.5)
                     """)
                 elif st.session_state.ai_analysis_results:
-                    # Multi-Agent 분석의 경우 - 저장된 결과 표시
+                    # Multi-Agent 분석의 경우 - 쿼리 확장 결과 표시 (제일 위)
+                    if hasattr(st.session_state, 'query_expansion_result') and st.session_state.query_expansion_result:
+                        exp_result = st.session_state.query_expansion_result
+                        st.success("✅ **AI 쿼리 확장 완료**")
+
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            st.markdown(f"**원본 쿼리:** {exp_result['original_query']}")
+                            st.markdown(f"**식별된 물품:** {exp_result['target_product']}")
+                            if exp_result.get('material'):
+                                st.markdown(f"**재질:** {exp_result['material']}")
+                            if exp_result.get('components'):
+                                st.markdown(f"**주요 성분:** {exp_result['components']}")
+                            if exp_result.get('function'):
+                                st.markdown(f"**주요 기능:** {exp_result['function']}")
+
+                        with col2:
+                            keyword_groups = exp_result.get('keyword_groups', {})
+                            if keyword_groups.get('similar_korean'):
+                                st.markdown(f"**한글 유사어:** {', '.join(keyword_groups['similar_korean'][:5])}")
+                            if keyword_groups.get('similar_english'):
+                                st.markdown(f"**영문 유사어:** {', '.join(keyword_groups['similar_english'][:5])}")
+                            if keyword_groups.get('material'):
+                                st.markdown(f"**재질 관련 용어:** {', '.join(keyword_groups['material'][:3])}")
+                            if keyword_groups.get('component'):
+                                st.markdown(f"**성분 관련 용어:** {', '.join(keyword_groups['component'][:3])}")
+                            if keyword_groups.get('function'):
+                                st.markdown(f"**기능 관련 용어:** {', '.join(keyword_groups['function'][:3])}")
+
+                        with st.expander("🔎 **전체 확장된 쿼리 보기**", expanded=False):
+                            st.text(exp_result['expanded_query'])
+
+                        st.divider()
+
+                    # 저장된 그룹별 분석 결과 표시
                     for result in st.session_state.ai_analysis_results:
                         emoji = "🤖" if result['type'] == 'domestic' else "🌐"
                         st.success(f"{emoji} **그룹 {result['group_id']+1} AI 분석 완료** ({result['processing_time']:.1f}초)")

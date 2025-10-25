@@ -584,7 +584,41 @@ for message in st.session_state.chat_history:
                     5. 🧠 최종 AI 비교 분석 (Gemini 2.5)
                     """)
                 elif st.session_state.ai_analysis_results:
-                    # Multi-Agent 분석의 경우 - 저장된 결과 표시
+                    # Multi-Agent 분석의 경우 - 쿼리 확장 결과 표시 (제일 위)
+                    if hasattr(st.session_state, 'query_expansion_result') and st.session_state.query_expansion_result:
+                        exp_result = st.session_state.query_expansion_result
+                        st.success("✅ **AI 쿼리 확장 완료**")
+
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            st.markdown(f"**원본 쿼리:** {exp_result['original_query']}")
+                            st.markdown(f"**식별된 물품:** {exp_result['target_product']}")
+                            if exp_result.get('material'):
+                                st.markdown(f"**재질:** {exp_result['material']}")
+                            if exp_result.get('components'):
+                                st.markdown(f"**주요 성분:** {exp_result['components']}")
+                            if exp_result.get('function'):
+                                st.markdown(f"**주요 기능:** {exp_result['function']}")
+
+                        with col2:
+                            keyword_groups = exp_result.get('keyword_groups', {})
+                            if keyword_groups.get('similar_korean'):
+                                st.markdown(f"**한글 유사어:** {', '.join(keyword_groups['similar_korean'][:5])}")
+                            if keyword_groups.get('similar_english'):
+                                st.markdown(f"**영문 유사어:** {', '.join(keyword_groups['similar_english'][:5])}")
+                            if keyword_groups.get('material'):
+                                st.markdown(f"**재질 관련 용어:** {', '.join(keyword_groups['material'][:3])}")
+                            if keyword_groups.get('component'):
+                                st.markdown(f"**성분 관련 용어:** {', '.join(keyword_groups['component'][:3])}")
+                            if keyword_groups.get('function'):
+                                st.markdown(f"**기능 관련 용어:** {', '.join(keyword_groups['function'][:3])}")
+
+                        with st.expander("🔎 **전체 확장된 쿼리 보기**", expanded=False):
+                            st.text(exp_result['expanded_query'])
+
+                        st.divider()
+
+                    # 저장된 그룹별 분석 결과 표시
                     for result in st.session_state.ai_analysis_results:
                         emoji = "🤖" if result['type'] == 'domestic' else "🌐"
                         st.success(f"{emoji} **그룹 {result['group_id']+1} AI 분석 완료** ({result['processing_time']:.1f}초)")
