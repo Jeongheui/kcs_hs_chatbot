@@ -155,7 +155,8 @@ class TfidfCaseSearcher:
         except Exception as e:
             print(f"TF-IDF 인덱스 저장 실패: {e}")
 
-    def search_domestic(self, query: str, top_k: int = 100, min_similarity: float = 0.1) -> List[Dict[str, Any]]:
+    def search_domestic(self, query: str, top_k: int = 100, min_similarity: float = 0.1,
+                       expanded_query: str = None) -> List[Dict[str, Any]]:
         """
         TF-IDF 기반 국내 HS 분류 사례 검색
 
@@ -163,6 +164,7 @@ class TfidfCaseSearcher:
             query: 검색 쿼리
             top_k: 반환할 상위 결과 개수
             min_similarity: 최소 유사도 임계값 (기본값 0.1)
+            expanded_query: AI가 확장한 쿼리 (선택사항)
 
         Returns:
             검색된 항목 리스트
@@ -170,10 +172,14 @@ class TfidfCaseSearcher:
         if self.domestic_tfidf is None:
             return []
 
-        results = self.domestic_tfidf.search(query, top_k, min_similarity)
+        # 확장된 쿼리가 제공되면 우선 사용
+        search_query = expanded_query if expanded_query else query
+
+        results = self.domestic_tfidf.search(search_query, top_k, min_similarity)
         return [self.domestic_items[idx] for idx, score in results]
 
-    def search_overseas(self, query: str, top_k: int = 100, min_similarity: float = 0.1) -> List[Dict[str, Any]]:
+    def search_overseas(self, query: str, top_k: int = 100, min_similarity: float = 0.1,
+                       expanded_query: str = None) -> List[Dict[str, Any]]:
         """
         TF-IDF 기반 해외 HS 분류 사례 검색
 
@@ -181,6 +187,7 @@ class TfidfCaseSearcher:
             query: 검색 쿼리
             top_k: 반환할 상위 결과 개수
             min_similarity: 최소 유사도 임계값 (기본값 0.1)
+            expanded_query: AI가 확장한 쿼리 (선택사항)
 
         Returns:
             검색된 항목 리스트
@@ -188,5 +195,8 @@ class TfidfCaseSearcher:
         if self.overseas_tfidf is None:
             return []
 
-        results = self.overseas_tfidf.search(query, top_k, min_similarity)
+        # 확장된 쿼리가 제공되면 우선 사용
+        search_query = expanded_query if expanded_query else query
+
+        results = self.overseas_tfidf.search(search_query, top_k, min_similarity)
         return [self.overseas_items[idx] for idx, score in results]

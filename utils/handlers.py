@@ -18,6 +18,7 @@ from .hs_manual_utils import (
     analyze_user_provided_codes
 )
 from .search_engines import ParallelHSSearcher
+from .query_expander import QueryExpander
 
 # API client는 main.py에서 파라미터로 전달받음
 
@@ -168,7 +169,7 @@ def _run_head_agent(group_answers, context_prompt, user_input, analysis_type, cl
 
 def handle_multi_agent_analysis(user_input, context, hs_manager, analysis_type, client, ui_container=None):
     """
-    통합 Multi-Agent 분석 핸들러
+    통합 Multi-Agent 분석 핸들러 (쿼리 확장 적용)
 
     Args:
         user_input: 사용자 질문
@@ -199,8 +200,46 @@ def handle_multi_agent_analysis(user_input, context, hs_manager, analysis_type, 
         with ui_container:
             st.info(ui_message)
 
-    # TF-IDF 기반 검색으로 상위 100개 사례 추출
-    top_cases = search_func(user_input, top_k=100, min_similarity=0.05)
+    # 쿼리 확장 단계 추가
+    try:
+        if ui_container:
+            with ui_container:
+                st.info("🧠 **AI 쿼리 확장 중...**")
+
+        expander = QueryExpander(client, 'balanced')
+        expansion_result = expander.expand_query(user_input)
+
+        # session_state에 쿼리 확장 결과 저장
+        if ui_container and expansion_result['expansion_applied']:
+            if 'query_expansion_result' not in st.session_state:
+                st.session_state.query_expansion_result = None
+
+            st.session_state.query_expansion_result = {
+                'target_product': expansion_result.get('target_product', 'N/A'),
+                'material': expansion_result.get('material', ''),
+                'components': expansion_result.get('components', ''),
+                'function': expansion_result.get('function', ''),
+                'keyword_groups': expansion_result.get('keyword_groups', {}),
+                'expanded_query': expansion_result.get('expanded_query', ''),
+                'original_query': user_input
+            }
+
+            with ui_container:
+                st.success(f"✅ **쿼리 확장 완료**: {expansion_result['target_product']}")
+                st.text(f"확장된 쿼리: {expansion_result['expanded_query'][:100]}...")
+
+        # 확장된 쿼리로 검색
+        expanded_query = expansion_result['expanded_query']
+
+    except Exception as e:
+        if ui_container:
+            st.session_state.query_expansion_result = None
+            with ui_container:
+                st.warning(f"⚠️ 쿼리 확장 실패, 원본 쿼리 사용: {str(e)}")
+        expanded_query = user_input
+
+    # TF-IDF 기반 검색으로 상위 100개 사례 추출 (확장된 쿼리 사용)
+    top_cases = search_func(expanded_query, top_k=100, min_similarity=0.05)
 
     # 5개 그룹으로 분할 (각 그룹 20개)
     group_size = len(top_cases) // 5
