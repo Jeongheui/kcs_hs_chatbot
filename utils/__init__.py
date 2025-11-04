@@ -10,6 +10,7 @@ utils package - HS 품목분류 챗봇 유틸리티 모듈 (리팩토링 버전)
 - hs_manual_utils: HS 해설서 관련 함수들
 - search_engines: 품목분류표 및 해설서 검색 엔진
 - handlers: 질문 유형별 처리 함수들
+- api_retry: API 재시도 로직 (503/429 에러 자동 복구)
 
 backward compatibility를 위해 Facade 패턴으로 기존 인터페이스 유지
 """
@@ -46,6 +47,13 @@ from .handlers import (
     handle_hs_manual_with_user_codes,
     handle_domestic_case_lookup,
     handle_overseas_case_lookup
+)
+
+# API retry utilities
+from .api_retry import (
+    retry_on_api_error,
+    retry_api_call,
+    create_retry_callback_for_streamlit
 )
 
 
@@ -161,7 +169,12 @@ __all__ = [
     'handle_overseas_hs',
     'handle_hs_manual_with_user_codes',
     'handle_domestic_case_lookup',
-    'handle_overseas_case_lookup'
+    'handle_overseas_case_lookup',
+
+    # API retry utilities
+    'retry_on_api_error',
+    'retry_api_call',
+    'create_retry_callback_for_streamlit'
 ]
 
 __version__ = '3.0.0'  # 리팩토링 버전

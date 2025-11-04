@@ -5,6 +5,7 @@ from google import genai
 from google.genai.errors import APIError
 from dotenv import load_dotenv
 from .text_utils import clean_text, general_explanation
+from .api_retry import retry_on_api_error
 
 # API client는 main.py에서 파라미터로 전달받음
 
@@ -123,21 +124,29 @@ HS코드: {code}
 간결하고 정확하게 요약해주세요."""
 
                 try:
-                    summary_response = client.models.generate_content(
-                        model="gemini-2.0-flash",
-                        contents=summary_prompt
-                    )
+                    # 재시도 로직 적용
+                    @retry_on_api_error(max_retries=3, initial_delay=0.5)
+                    def _summary_api_call():
+                        return client.models.generate_content(
+                            model="gemini-2.0-flash",
+                            contents=summary_prompt
+                        )
+
+                    summary_response = _summary_api_call()
                     manual_info[code] = {
                         'content': clean_text(summary_response.text),
                         'summary_used': True
                     }
                     logger.log_actual("SUCCESS", f"HS{code} manual summarized", f"{len(manual_info[code]['content'])} chars")
+
                 except APIError as e:
-                    logger.log_actual("ERROR", f"HS{code} Gemini API error (code: {e.code})", e.message)
+                    # API 에러 (재시도 후에도 실패)
+                    logger.log_actual("ERROR", f"HS{code} API error after retries (code: {e.code})", e.message)
                     manual_info[code] = {
                         'content': full_content[:1000] + "...",
                         'summary_used': False
                     }
+
                 except Exception as e:
                     logger.log_actual("ERROR", f"HS{code} summary failed: {str(e)}")
                     manual_info[code] = {
@@ -248,16 +257,23 @@ def analyze_user_provided_codes(user_input, hs_codes, tariff_info, manual_info, 
 
     # Gemini AI 분석 수행
     try:
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=analysis_prompt
-        )
+        # 재시도 로직 적용
+        @retry_on_api_error(max_retries=3, initial_delay=0.5)
+        def _analysis_api_call():
+            return client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=analysis_prompt
+            )
+
+        response = _analysis_api_call()
         return clean_text(response.text)
+
     except APIError as e:
-        error_msg = f"Gemini API 오류가 발생했습니다.\n\n**오류 코드**: {e.code}\n**오류 메시지**: {e.message}\n\n"
+        # API 에러 (재시도 후에도 실패)
+        error_msg = f"Gemini API 오류가 발생했습니다 (3회 재시도 후 실패).\n\n**오류 코드**: {e.code}\n**오류 메시지**: {e.message}\n\n"
 
         if e.code == 503:
-            error_msg += "**해결 방법**: API 서버가 일시적으로 과부하 상태입니다. 잠시 후 다시 시도해주세요."
+            error_msg += "**해결 방법**: API 서버가 지속적으로 과부하 상태입니다. 잠시 후 다시 시도해주세요."
         elif e.code == 429:
             error_msg += "**해결 방법**: API 사용량 한도를 초과했습니다. 잠시 후 다시 시도해주세요."
         elif e.code == 404:
@@ -268,5 +284,6 @@ def analyze_user_provided_codes(user_input, hs_codes, tariff_info, manual_info, 
             error_msg += "**해결 방법**: 문제가 지속되면 관리자에게 문의해주세요."
 
         return error_msg
+
     except Exception as e:
         return f"처리 중 예상치 못한 오류가 발생했습니다.\n\n**오류 내용**: {str(e)}\n\n관리자에게 문의해주세요."

@@ -9,6 +9,8 @@ import json
 import os
 from typing import List, Dict, Set
 from google import genai
+from google.genai.errors import APIError
+from .api_retry import retry_on_api_error
 
 
 class QueryExpander:
@@ -173,10 +175,15 @@ class QueryExpander:
             # AI 기반 쿼리 확장
             prompt = self._create_expansion_prompt(user_query)
 
-            response = self.client.models.generate_content(
-                model="gemini-2.0-flash",
-                contents=prompt
-            )
+            # 재시도 로직 적용
+            @retry_on_api_error(max_retries=3, initial_delay=0.5)
+            def _expansion_api_call():
+                return self.client.models.generate_content(
+                    model="gemini-2.0-flash",
+                    contents=prompt
+                )
+
+            response = _expansion_api_call()
 
             # JSON 파싱
             response_text = response.text.strip()
@@ -220,11 +227,26 @@ class QueryExpander:
 
             return result
 
+        except APIError as e:
+            # API 에러 (재시도 후에도 실패)
+            print(f"Query expansion API error ({e.code}): {e.message}")
+            print("Falling back to original query...")
+
+            return {
+                'original_query': user_query,
+                'target_product': None,
+                'expanded_query': user_query,
+                'keyword_groups': {'original': [user_query]},
+                'all_keywords': [user_query],
+                'expansion_applied': False,
+                'error': f"API Error {e.code}: {e.message}"
+            }
+
         except Exception as e:
+            # 기타 에러 (JSON 파싱 등)
             print(f"Query expansion failed: {e}")
             print("Falling back to original query...")
 
-            # 실패 시 원본 쿼리 반환
             return {
                 'original_query': user_query,
                 'target_product': None,
