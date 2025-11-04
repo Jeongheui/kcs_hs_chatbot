@@ -19,6 +19,7 @@ from .hs_manual_utils import (
 )
 from .search_engines import ParallelHSSearcher
 from .query_expander import QueryExpander
+from .api_retry import retry_on_api_error, retry_api_call
 
 # API client는 main.py에서 파라미터로 전달받음
 
@@ -57,29 +58,93 @@ def highlight_keywords(text, keywords):
 
 # ==================== Multi-Agent 공통 로직 ====================
 
+def truncate_text_at_sentence(text, max_chars):
+    """텍스트를 문장 단위로 제한"""
+    if not text or len(text) <= max_chars:
+        return text
+
+    # 일단 max_chars까지 자르기
+    truncated = text[:max_chars]
+
+    # 문장 끝 찾기 (마침표, 한글 마침표, 줄바꿈)
+    last_sentence_end = max(
+        truncated.rfind('.'),
+        truncated.rfind('。'),
+        truncated.rfind('\n')
+    )
+
+    # 80% 이상 지점에서 문장 끝을 찾았으면 그곳에서 자르기
+    if last_sentence_end > max_chars * 0.8:
+        return truncated[:last_sentence_end + 1]
+
+    # 못 찾았으면 그냥 자르고 ... 추가
+    return truncated + "..."
+
+
+def truncate_case_text(case, max_chars=1500):
+    """사례의 긴 텍스트 필드를 제한 (문장 단위)"""
+    truncated_case = case.copy()
+
+    # description 필드 제한
+    if 'description' in truncated_case and truncated_case['description']:
+        truncated_case['description'] = truncate_text_at_sentence(
+            truncated_case['description'], max_chars
+        )
+
+    # reply 필드 제한 (해외 사례)
+    if 'reply' in truncated_case and truncated_case['reply']:
+        truncated_case['reply'] = truncate_text_at_sentence(
+            truncated_case['reply'], max_chars
+        )
+
+    # decision_reason 필드 제한 (국내 사례)
+    if 'decision_reason' in truncated_case and truncated_case['decision_reason']:
+        truncated_case['decision_reason'] = truncate_text_at_sentence(
+            truncated_case['decision_reason'], max_chars
+        )
+
+    return truncated_case
+
+
 def _process_single_group(group_id, group_cases, context_prompt, user_input, analysis_type, client):
-    """단일 그룹 처리 함수 (병렬 실행용)"""
+    """단일 그룹 처리 함수 (병렬 실행용, 재시도 로직 포함)"""
     try:
+        # 텍스트 길이 제한 적용 (토큰 소비 감소)
+        truncated_cases = [truncate_case_text(case, max_chars=1500) for case in group_cases]
+
         # 그룹 데이터를 컨텍스트로 변환
         source_label = "국내 관세청" if analysis_type == 'domestic' else "해외 관세청"
         relevant = "\n\n".join([
             f"출처: {source_label}\n항목: {json.dumps(case, ensure_ascii=False)}"
-            for case in group_cases
+            for case in truncated_cases
         ])
 
         prompt = f"{context_prompt}\n\n관련 데이터 ({source_label}, 그룹{group_id+1}):\n{relevant}\n\n사용자: {user_input}\n"
 
         start_time = datetime.now()
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=prompt
-        )
+
+        # 재시도 로직 적용
+        @retry_on_api_error(max_retries=3, initial_delay=0.5)
+        def _api_call():
+            return client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=prompt
+            )
+
+        response = _api_call()
         end_time = datetime.now()
         processing_time = (end_time - start_time).total_seconds()
 
         answer = clean_text(response.text)
         return group_id, answer, start_time, processing_time
+
+    except APIError as e:
+        # API 에러 (재시도 후에도 실패)
+        error_msg = f"그룹 {group_id+1} API 오류 ({e.code}): {e.message}"
+        return group_id, error_msg, datetime.now(), 0.0
+
     except Exception as e:
+        # 기타 예외
         error_msg = f"그룹 {group_id+1} 분석 중 오류 발생: {str(e)}"
         return group_id, error_msg, datetime.now(), 0.0
 
@@ -95,10 +160,15 @@ def _run_group_parallel_analysis(groups, context_prompt, user_input, analysis_ty
     # 병렬 처리
     results = {}
     with ThreadPoolExecutor(max_workers=3) as executor:
-        futures = [
-            executor.submit(_process_single_group, i, groups[i], context_prompt, user_input, analysis_type, client)
-            for i in range(5)
-        ]
+        # 그룹 시작 시 순차 딜레이 적용 (동시 API 호출 충돌 방지)
+        futures = []
+        for i in range(5):
+            # 각 그룹마다 0.3초씩 지연 시작
+            if i > 0:
+                time.sleep(0.3)
+            futures.append(
+                executor.submit(_process_single_group, i, groups[i], context_prompt, user_input, analysis_type, client)
+            )
 
         for future in as_completed(futures):
             group_id, answer, start_time, processing_time = future.result()
@@ -133,7 +203,7 @@ def _run_group_parallel_analysis(groups, context_prompt, user_input, analysis_ty
 
 
 def _run_head_agent(group_answers, context_prompt, user_input, analysis_type, client, ui_container=None):
-    """Head Agent가 5개 답변을 종합하는 함수"""
+    """Head Agent가 5개 답변을 종합하는 함수 (재시도 로직 포함)"""
 
     if ui_container:
         ui_container.progress(1.0, text="Head AI 최종 분석 중...")
@@ -147,11 +217,22 @@ def _run_head_agent(group_answers, context_prompt, user_input, analysis_type, cl
             head_prompt += f"[그룹{idx+1} 답변]\n{ans}\n\n"
         head_prompt += f"\n사용자: {user_input}\n"
 
-        head_response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=head_prompt
-        )
+        # 재시도 로직 적용
+        @retry_on_api_error(max_retries=3, initial_delay=0.5)
+        def _head_api_call():
+            return client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=head_prompt
+            )
+
+        head_response = _head_api_call()
         final_answer = clean_text(head_response.text)
+
+    except APIError as e:
+        final_answer = f"Head AI API 오류 ({e.code}): {e.message}\n\n그룹별 분석 결과를 참고해주세요."
+        if ui_container:
+            ui_container.error(f"⚠️ Head AI API 오류 ({e.code}): {e.message}")
+
     except Exception as e:
         final_answer = f"Head AI 분석 중 오류가 발생했습니다: {str(e)}\n\n그룹별 분석 결과를 참고해주세요."
         if ui_container:
@@ -269,7 +350,7 @@ def handle_overseas_hs(user_input, context, hs_manager, client, ui_container=Non
 # ==================== 기타 핸들러 함수 ====================
 
 def handle_web_search(user_input, context, hs_manager, client):
-    """웹 검색 처리 함수"""
+    """웹 검색 처리 함수 (재시도 로직 포함)"""
     web_context = """당신은 HS 품목분류 전문가입니다.
 
 사용자의 질문에 대해 최신 웹 정보를 검색하여 물품개요, 용도, 기술개발, 산업동향 등의 정보를 제공해주세요.
@@ -280,11 +361,16 @@ def handle_web_search(user_input, context, hs_manager, client):
 
     prompt = f"{web_context}\n\n사용자: {user_input}\n"
 
-    response = client.models.generate_content(
-        model="gemini-2.0-flash",
-        contents=prompt,
-        config=config)
+    # 재시도 로직 적용
+    @retry_on_api_error(max_retries=3, initial_delay=0.5)
+    def _web_search_api_call():
+        return client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=prompt,
+            config=config
+        )
 
+    response = _web_search_api_call()
     return clean_text(response.text)
 
 
